@@ -15,133 +15,70 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Endpoint discovery
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install curl_cffi
+        run: pip install --quiet curl_cffi
+
+      - name: Impersonation test
         continue-on-error: true
         run: |
-          set +e
           mkdir -p probe-results
-          UA='Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Mobile Safari/537.36'
-          BASE=https://mangaball.com/api/v1
-          {
-            echo "## Endpoint discovery"
-            for ep in "title/search-advanced?page=1&limit=1" "tag" "tags" "genre" "genres" "tag/all" "tags/all" "genre/all" "title/tag-listing" "title/tags" "title/genres" \
-                      "title/search?keyword=naruto&page=1&limit=2"; do
-              code=$(curl -s -o /tmp/o.json -w '%{http_code}' -A "$UA" --max-time 30 "$BASE/$ep")
-              echo "### $ep -> HTTP $code"
-              head -c 400 /tmp/o.json; echo; echo "---"
-            done
-          } > probe-results/01-endpoints.txt 2>&1
+          python3 - <<'PY' > probe-results/10-impersonate.txt 2>&1
+          from curl_cffi import requests
+          targets = [
+              ("chrome", "https://mangaball.com/api/v1/title/search-advanced?page=1&limit=1"),
+              ("chrome124", "https://mangaball.com/api/v1/title/search-advanced?page=1&limit=1"),
+              ("safari17_0", "https://mangaball.com/api/v1/title/search-advanced?page=1&limit=1"),
+              ("chrome_android", "https://mangaball.com/api/v1/title/search-advanced?page=1&limit=1"),
+          ]
+          for imp, url in targets:
+              try:
+                  r = requests.get(url, impersonate=imp, timeout=45,
+                                   headers={"Accept": "application/json, text/plain, */*",
+                                            "Accept-Language": "en-US,en;q=0.9",
+                                            "Referer": "https://mangaball.com/search-advanced"})
+                  print(f"### {imp} -> {r.status_code} len={len(r.content)}")
+                  print(r.text[:300].replace("\n", " "))
+              except Exception as e:
+                  print(f"### {imp} -> ERROR {type(e).__name__}: {e}")
+              print("---")
+          # plain requests for comparison
+          try:
+              r = requests.get("https://mangaball.com/api/v1/title/search-advanced?page=1&limit=1", timeout=45)
+              print(f"### plain -> {r.status_code}")
+          except Exception as e:
+              print(f"### plain -> ERROR {e}")
+          PY
+          cat probe-results/10-impersonate.txt
 
-      - name: Search params behaviour
+      - name: Session based access (HTML first, then API)
         continue-on-error: true
         run: |
-          set +e
-          UA='Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Mobile Safari/537.36'
-          BASE=https://mangaball.com/api/v1/title/search-advanced
-          probe() {
-            local label="$1"; shift
-            local url="$BASE?page=1&limit=5&$1"
-            out=$(curl -s -A "$UA" --max-time 30 "$url")
-            echo "### $label  [$url]"
-            echo "$out" | jq -c 'if .data then {n: (.data|length), names: [.data[].name], extra_keys: (.data[0]|keys|length), meta: (.meta // .pagination // .meta_data // .total // null)} else . end' 2>/dev/null || echo "RAW: $(echo "$out" | head -c 300)"
-            echo "---"
-          }
-          {
-            echo "## Search params"
-            probe "baseline" ""
-            probe "keyword=naruto" "keyword=naruto"
-            probe "search=naruto" "search=naruto"
-            probe "q=naruto" "q=naruto"
-            probe "name=naruto" "name=naruto"
-            probe "title=naruto" "title=naruto"
-            probe "genres=romance" "genres=romance"
-            probe "genre=romance" "genre=romance"
-            probe "tags=romance" "tags=romance"
-            probe "tag=romance" "tag=romance"
-            probe "tag_ids=685148cf15e8b86aae68e4db" "tag_ids=685148cf15e8b86aae68e4db"
-            probe "status=completed" "status=completed"
-            probe "adult_mode=all" "adult_mode=all"
-            probe "sort_by=views" "sort_by=views"
-            probe "sort=views" "sort=views"
-            probe "sort_order=asc" "sort_order=asc"
-            probe "page=2" "page=2&limit=5"
-          } > probe-results/02-searchparams.txt 2>&1
-
-      - name: Frontend RSC + JS analysis
-        continue-on-error: true
-        run: |
-          set +e
-          UA='Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Mobile Safari/537.36'
-          mkdir -p /tmp/fe && cd /tmp/fe
-          {
-            echo "## RSC payload hunt"
-            curl -s -A "$UA" --max-time 60 https://mangaball.com/search-advanced -o page.html
-            echo "HTML size: $(wc -c < page.html)"
-            echo "title-detail links in HTML: $(grep -o 'title-detail/' page.html | wc -l)"
-            echo "__next_f pushes: $(grep -o '__next_f' page.html | wc -l)"
-            echo "search-advanced occurrences in HTML: $(grep -o 'search-advanced' page.html | wc -l)"
-            echo "=== RSC chunks mentioning search-advanced (context) ==="
-            grep -o -E '.{600}search-advanced.{600}' page.html | head -10
-            echo "=== all query-ish keys inside RSC payload ==="
-            grep -o -h -E '\\"(genres?|tags?|keyword|search|query|exclude[A-Za-z_]*|include[A-Za-z_]*|sort[A-Za-z_]*|order[A-Za-z_]*|status|demographic|type|originalLanguage|languages?|adult_mode|page|limit|title_type|publicationDemographic)\\"\s*:' page.html | sort | uniq -c | sort -rn | head -40
-          } > "$GITHUB_WORKSPACE/probe-results/03-rsc.txt" 2>&1
-          {
-            echo "## JS analysis"
-            grep -o -E '/_next/static/[^"]+\.js' page.html | sort -u > chunks.txt
-            echo "chunks found: $(wc -l < chunks.txt)"
-            i=0
-            while read -r c; do
-              i=$((i+1))
-              curl -s -A "$UA" --max-time 60 "https://mangaball.com$c" -o "chunk_$i.js"
-            done < chunks.txt
-            echo "downloaded: $(ls chunk_*.js 2>/dev/null | wc -l) files"
-            echo "=== files containing 'search-advanced' ==="
-            grep -l "search-advanced" chunk_*.js 2>/dev/null || echo none
-            echo "=== context around search-advanced ==="
-            grep -o -h -E '.{400}search-advanced.{400}' chunk_*.js 2>/dev/null | head -30
-            echo "=== TAGS/GENRE endpoint strings ==="
-            grep -o -h -E '"[a-z0-9/_-]*(tag|genre)[a-z0-9/_-]*"' chunk_*.js 2>/dev/null | sort -u | head -80
-            echo "=== query param keys used near filters ==="
-            grep -o -h -E '(genres|tags|excluded_tags|exclude_tags|include_tags|tag_ids|genre_ids|keyword|sort_by|sort_order|order_by|adult_mode|demographic|publicationDemographic|originalLanguage|chapter_count)[^,;{}]{0,60}' chunk_*.js 2>/dev/null | sort | uniq -c | sort -rn | head -60
-          } > "$GITHUB_WORKSPACE/probe-results/04-js.txt" 2>&1
-
-      - name: Detail chapter pages
-        continue-on-error: true
-        run: |
-          set +e
-          UA='Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Mobile Safari/537.36'
-          BASE=https://mangaball.com/api/v1
-          {
-            echo "## Detail / chapter / pages"
-            TID=6851549a702284f834178389
-            for ep in "title/detail?id=$TID" "title/$TID" "title/detail/$TID" "title-detail/$TID" "title/slug/naruto-official-colored"; do
-              code=$(curl -s -o /tmp/d.json -w '%{http_code}' -A "$UA" --max-time 30 "$BASE/$ep")
-              echo "### $ep -> $code"; head -c 250 /tmp/d.json; echo; echo "---"
-            done
-            echo "=== chapter listing ==="
-            curl -s -A "$UA" --max-time 30 "$BASE/title/chapter-listing?title_id=$TID&page=1&sort_order=desc&group_by=chapter_number&limit=2" > /tmp/cl.json
-            echo "top-level keys: $(jq -c 'keys' /tmp/cl.json)"
-            jq -c '{first: .grouped_data[0] | {chapter_number, name, keys: keys, releases: (.releases|length), release0: .releases[0]}}' /tmp/cl.json 2>/dev/null | head -c 1200
-            echo; echo "=== chapter detail ==="
-            CID=$(jq -r '.grouped_data[0].releases[0].id' /tmp/cl.json 2>/dev/null)
-            echo "chapter id: $CID"
-            curl -s -A "$UA" --max-time 30 "$BASE/chapter-detail?chapter_id=$CID" > /tmp/cd.json
-            echo "keys: $(jq -c 'keys' /tmp/cd.json)"
-            jq -c '{data: {keys: (.data|keys), chapter_keys: (.data.chapter|keys), pages: .data.chapter.pages[0:2], n_pages: (.data.chapter.pages|length)}}' /tmp/cd.json 2>/dev/null || head -c 800 /tmp/cd.json
-            echo; echo "=== genre/tag listing on home page RSC ==="
-            curl -s -A "$UA" --max-time 60 https://mangaball.com/ -o /tmp/home.html
-            grep -o -E 'api/v1/[a-zA-Z0-9/_-]+' /tmp/home.html | sort -u | head -40
-          } > probe-results/05-detail.txt 2>&1
+          python3 - <<'PY' > probe-results/11-session.txt 2>&1
+          from curl_cffi import requests
+          s = requests.Session(impersonate="chrome")
+          try:
+              home = s.get("https://mangaball.com/", timeout=45)
+              print("home:", home.status_code, len(home.content))
+              print("cf cookies:", [c.name for c in s.cookies.jar])
+              r = s.get("https://mangaball.com/api/v1/title/search-advanced?page=1&limit=1", timeout=45,
+                        headers={"Accept": "application/json, text/plain, */*", "Referer": "https://mangaball.com/"})
+              print("api:", r.status_code, len(r.content))
+              print(r.text[:400].replace("\n", " "))
+          except Exception as e:
+              print("ERROR", type(e).__name__, e)
+          PY
+          cat probe-results/11-session.txt
 
       - name: Commit results
         continue-on-error: true
         run: |
-          set +e
           git config user.name "probe-bot"
           git config user.email "probe-bot@users.noreply.github.com"
           git add -A probe-results
           git commit -m "chore: probe results [skip ci]" || echo "nothing to commit"
           git pull --rebase --autostash origin "${GITHUB_REF_NAME}"
           git push origin "HEAD:${GITHUB_REF_NAME}"
-          echo "=== sizes ==="
-          ls -la probe-results
