@@ -148,7 +148,8 @@ in about three minutes.
 | Symptom | Fix |
 | --- | --- |
 | Source shows a red *untrusted* marker | Extensions → Untrusted → tap the shield next to *MangaBall Enhanced*. |
-| The extension vanishes right after you trust it | Fixed since v1.6.9. Earlier builds were flagged as NSFW, and both Komikku and Mihon silently drop NSFW-flagged extensions while *Settings → Browse → Show NSFW sources* is off. Either update to v1.6.9+, or enable that toggle (Komikku: Settings → Browse → **NSFW content → Show NSFW sources**, then restart the app) and trust the extension again. |
+| The extension vanishes right after you trust it, or is not listed at all | Follow **section 10** — it is written as a checklist, in order. Short version: uninstall the old extension first (older builds used a different signing key), install the newest APK, check Android *Settings → Apps* for the version, and enable *Show NSFW sources* for builds older than v1.6.9. |
+| (old note) Fixed since v1.6.9. Earlier builds were flagged as NSFW, and both Komikku and Mihon silently drop NSFW-flagged extensions while *Settings → Browse → Show NSFW sources* is off. Either update to v1.6.9+, or enable that toggle (Komikku: Settings → Browse → **NSFW content → Show NSFW sources**, then restart the app) and trust the extension again. |
 | Extension loaded, but no source in Browse | The app hides sources whose language is not enabled. Komikku: Settings → Browse → **Languages** → enable the languages you want; then restart. |
 | Search returns nothing | Clear the included tags / switch Tag mode from AND to OR — very specific combinations genuinely have no results. |
 | "HTTP 403" or a Cloudflare page | Enable **Use Cloudflare bypass client** in the source settings. |
@@ -199,3 +200,67 @@ app first.
 - The package name is `eu.kanade.tachiyomi.extension.all.mangaball`. If you also install the
   official Keiyoushi *Manga Ball* extension (same package name, different key), Android will
   refuse the second one — uninstall one before installing the other.
+
+## 10. The extension is not listed anywhere (not even under Untrusted)
+
+Work through this **in order** — each step tells you what the next one means.
+
+### Step 1 - Uninstall the old extension first
+
+Android *Settings → Apps → Tachiyomi: MangaBall Enhanced* → **Uninstall**.
+Also uninstall any other MangaBall extension (for example the official *Manga Ball* from the
+Keiyoushi repo) - it uses the *same* package name, so the two can never be installed together.
+
+> Why this matters: builds v1.6.1-v1.6.4 were signed with a throwaway key. Android refuses to
+> replace an app whose signing key changed, so installing a newer APK on top of one of those
+> fails with "App not installed" and the **old** build stays on the phone. Those old builds are
+> flagged 18+, which is exactly the flag that makes them vanish when *Show NSFW sources* is off.
+
+### Step 2 - Install the newest APK, then confirm it really installed
+
+Open Android *Settings → Apps → Tachiyomi: MangaBall Enhanced* and read the version.
+It must show the version of the APK you just downloaded (**1.6.13** or newer).
+If it shows an older version, or the app is not in the list at all, the install did not happen -
+that is the entire problem, and no reader-app setting will help.
+
+### Step 3 - Look in Komikku/Mihon
+
+*More → Extensions*:
+- **Untrusted** tab → tap the shield next to *MangaBall Enhanced*.
+- If it is not in *Untrusted* and not in *Installed*, check these:
+
+| Possible cause | What to do |
+| --- | --- |
+| Reader app hides 18+ sources | **Old builds only (v1.6.10 and older).** Komikku: *Settings → Browse → NSFW content → Show NSFW sources* (phone PIN required), then **fully close and reopen** the app. v1.6.11+ is not flagged 18+ at all. |
+| App too old for extension lib 1.6 | Komikku and Mihon must support extension **lib 1.6** (Komikku ≥ 1.13.x, Mihon ≥ 0.19). Update the reader app. |
+| Another extension uses the same package name | Both *MangaBall Enhanced* and the official *Manga Ball* are `eu.kanade.tachiyomi.extension.all.mangaball` - only one can be installed. Uninstall the other. |
+| Package visibility | Not an issue: Komikku/Mihon request `QUERY_ALL_PACKAGES`, and the APK declares `<uses-feature android:name="tachiyomi.extension" />`. Both are verified on every build in `build-info/apk-verification.txt`. |
+
+### Step 4 - Let the extension diagnose itself
+
+Since v1.6.13 the factory can no longer fail silently: if the language sources cannot be built,
+the extension publishes a source called **MangaBall Diagnostics** instead of disappearing.
+
+Open **Browse → MangaBall Diagnostics** and read the three entries:
+
+| Entry | What it tells you |
+| --- | --- |
+| **1. Extension API loaded** | The APK, its signature, its metadata and its lib version were all accepted. The problem is then app-side (NSFW/language filters) or in the language sources. |
+| **2. Language sources** | Lists the exact exception if a language source failed to build. |
+| **3. Site reachability** | Makes a real request to the site and reports the HTTP status - including the Cloudflare case. |
+| **4. What to do** | Where to send the result. |
+
+If *MangaBall Diagnostics* does not appear either, the app never loaded the APK - go back to
+Step 2 (the install) and Step 3 (the NSFW / lib version gates).
+
+### Step 5 - Send the app log
+
+Mihon/Komikku: *More → Settings → Advanced → Share crash logs* writes a text file you can send.
+The lines we need look like:
+
+```
+Extension load error: MangaBall Enhanced (eu.kanade.tachiyomi.extension.all.mangaball)
+java.lang.NoClassDefFoundError: ...
+```
+
+That single line names the exact cause.
