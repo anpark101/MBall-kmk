@@ -123,6 +123,12 @@ jobs:
             echo "## Application info"
             "$TOOLS/aapt2" dump badging "$apk" | grep -E "^(package|application|sdkVersion|targetSdkVersion|uses-feature)" | head -n 10
             echo
+            echo "## Full manifest (a merged <uses-feature tachiyomi.extension /> is REQUIRED for the app to list the extension)"
+            "$TOOLS/aapt2" dump xmltree --file AndroidManifest.xml "$apk" | sed -n '1,40p'
+            echo
+            echo "## Feature lines reported by aapt badging"
+            "$TOOLS/aapt2" dump badging "$apk" | grep -i "feature" || echo "!! NO uses-feature line -- the app would NOT see this APK as an extension !!"
+            echo
             echo "## Manifest meta-data"
             "$TOOLS/aapt2" dump xmltree --file AndroidManifest.xml "$apk" \
               | grep -A 2 "E: meta-data" | head -n 60
