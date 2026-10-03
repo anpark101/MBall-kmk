@@ -236,10 +236,40 @@ that is the entire problem, and no reader-app setting will help.
 | Another extension uses the same package name | Both *MangaBall Enhanced* and the official *Manga Ball* are `eu.kanade.tachiyomi.extension.all.mangaball` - only one can be installed. Uninstall the other. |
 | Package visibility | Not an issue: Komikku/Mihon request `QUERY_ALL_PACKAGES`, and the APK declares `<uses-feature android:name="tachiyomi.extension" />`. Both are verified on every build in `build-info/apk-verification.txt`. |
 
+### Step 3b - The two app-side filters that hide *sources* (not the extension)
+
+An extension can be perfectly loaded and still show **no sources** in Browse. Komikku filters
+every source through this (verified in its own source code):
+
+```kotlin
+sources.filter { it.lang in enabledLanguages || it.isLocal() }
+       .filterNot { it.id.toString() in disabledSources || it.id in BlacklistedSources.HIDDEN_SOURCES }
+```
+
+So two settings decide whether "MangaBall (English)" appears:
+
+| Filter | Where | Default |
+| --- | --- | --- |
+| `enabledLanguages` | *More → Settings → Browse → **Languages*** | `all`, `en` and the phone's language - **English is on by default** |
+| `disabledSources` | *More → **Extensions** → Installed → tap **MangaBall Enhanced*** - the source list has one on/off toggle per source (tapping a row disables it) | all enabled |
+
+**How to check in 10 seconds:** go to *More → Extensions → Installed → MangaBall Enhanced*.
+That details screen lists **every source the extension provides** and whether each is enabled.
+
+| What you see there | What it means |
+| --- | --- |
+| 40 sources incl. **MangaBall (English)**, all enabled, but Browse is empty | The app's **Languages** setting does not include English → enable it (Step 3b table above) and restart. |
+| **MangaBall (English)** is missing from the list | The English source failed to build - the extension now says so in *MangaBall Diagnostics* (Step 4), which is published **whenever any source fails**. |
+| Sources are listed but **disabled/greyed** | Tap each row to re-enable it, or tap the shield/switch - Browse hides disabled sources. |
+| Only some languages are missing | Those language sources failed to build; see *MangaBall Diagnostics → 2. Language sources*. |
+
 ### Step 4 - Let the extension diagnose itself
 
-Since v1.6.13 the factory can no longer fail silently: if the language sources cannot be built,
-the extension publishes a source called **MangaBall Diagnostics** instead of disappearing.
+Since v1.6.14 the factory can no longer fail silently: it publishes a source called
+**MangaBall Diagnostics** as soon as **any** language source fails to build (not only when all
+of them fail), and that source reports how many sources were created, which ones, and the exact
+exception behind every failure. Its language follows the phone's language so the app's language
+filter cannot hide the report itself.
 
 Open **Browse → MangaBall Diagnostics** and read the three entries:
 

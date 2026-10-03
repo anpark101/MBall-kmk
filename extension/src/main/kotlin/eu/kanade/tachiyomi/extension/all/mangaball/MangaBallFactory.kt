@@ -44,15 +44,19 @@ class MangaBallFactory : SourceFactory {
             emptyList()
         }
 
-        if (sources.isNotEmpty()) return sources
-
-        // Nothing could be created: surface the reason instead of disappearing.
-        return try {
-            listOf<Source>(MangaBallDiagnostics(failures))
-        } catch (error: Throwable) {
-            failures += describe(error)
-            emptyList()
+        // Whenever anything failed - even if other sources still work - publish the diagnostics
+        // source next to them. A partially working extension must never look healthy, otherwise
+        // a missing language (for example "MangaBall (English)") is impossible to explain.
+        if (sources.isEmpty() || failures.isNotEmpty()) {
+            return try {
+                sources + MangaBallDiagnostics(failures, sources.map { it.name })
+            } catch (error: Throwable) {
+                failures += describe(error)
+                sources
+            }
         }
+
+        return sources
     }
 
     private fun describe(error: Throwable): String {
@@ -116,11 +120,18 @@ internal object MangaBallLanguages {
  */
 internal class MangaBallDiagnostics(
     private val failures: List<String>,
+    private val created: List<String> = emptyList(),
 ) : HttpSource() {
 
     override val name: String = "MangaBall Diagnostics"
     override val baseUrl: String = BASE_URL
-    override val lang: String = "en"
+
+    // Use the phone's language so the app's language filter does not hide this source.
+    override val lang: String = runCatching { java.util.Locale.getDefault().language }
+        .getOrNull()
+        ?.takeIf { it.isNotBlank() }
+        ?: "en"
+
     override val supportsLatest: Boolean = false
 
     override fun headersBuilder() = super.headersBuilder()
@@ -147,12 +158,28 @@ internal class MangaBallDiagnostics(
 
         entries += entry(
             "2. Language sources",
-            if (failures.isEmpty()) {
-                "All 40 language sources were created successfully, so this diagnostics source " +
-                    "should not normally be visible at all.\n\nIf you are seeing it, the app " +
-                    "loaded the extension but something else in the app hid the sources."
-            } else {
-                "These sources could not be created:\n\n" + failures.distinct().joinToString("\n")
+            buildString {
+                append("Created: ")
+                append(created.size)
+                append(" of ")
+                append(MangaBallLanguages.SOURCES.size)
+                append(" language sources.")
+                if (created.isNotEmpty()) {
+                    append("\n\n")
+                    append(created.joinToString(", "))
+                }
+                append("\n\n")
+                if (failures.isEmpty()) {
+                    append(
+                        "No source failed to build, so this diagnostics source would normally not " +
+                            "appear. If you can see it, the app loaded the extension but hid some " +
+                            "of its sources: check the extension's source list and the app's " +
+                            "Languages setting.",
+                    )
+                } else {
+                    append("Failed to build:\n")
+                    append(failures.distinct().joinToString("\n"))
+                }
             },
         )
 
