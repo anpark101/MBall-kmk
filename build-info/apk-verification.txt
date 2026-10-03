@@ -1,0 +1,53 @@
+# APK verification
+
+File: tachiyomi-all.mangaball-enhanced-v1.6.5.apk  (738250 bytes)
+
+## Signing certificate
+V2 Signer: certificate DN: CN=MangaBall Enhanced, OU=Extensions, O=GitHub, C=US
+V2 Signer: certificate SHA-256 digest: 639d9d5554beb2b95d4e95d27a4b7f66bd7e7f7344d92cd50d2646760a39094e
+V2 Signer: certificate SHA-1 digest: 8d3e738ca20813701580ce2668167bf8f15e8632
+V2 Signer: certificate MD5 digest: 2e51bb0a7396f408c6fdaeb2772babd5
+WARNING: META-INF/com/android/build/gradle/app-metadata.properties not protected by signature. Unauthorized modifications to this JAR entry will not be detected. Delete or move the entry outside of META-INF/.
+WARNING: META-INF/version-control-info.textproto not protected by signature. Unauthorized modifications to this JAR entry will not be detected. Delete or move the entry outside of META-INF/.
+
+## Application info
+package: name='eu.kanade.tachiyomi.extension.all.mangaball' versionCode='5' versionName='1.6.5' platformBuildVersionName='15' platformBuildVersionCode='35' compileSdkVersion='35' compileSdkVersionCodename='15'
+targetSdkVersion:'35'
+application-label:'Tachiyomi: MangaBall Enhanced'
+application-icon-640:'res/o-.png'
+application: label='Tachiyomi: MangaBall Enhanced' icon='res/o-.png'
+
+## Manifest meta-data
+          E: meta-data (line=22)
+          E: meta-data (line=25)
+          E: meta-data (line=28)
+          E: meta-data (line=33)
+          E: meta-data (line=36)
+          E: meta-data (line=41)
+          E: meta-data (line=44)
+          E: meta-data (line=47)
+
+## Archive contents
+Archive:  extension/build/outputs/apk/release/tachiyomi-all.mangaball-enhanced-v1.6.5.apk
+  Length      Date    Time    Name
+---------  ---------- -----   ----
+       56  1981-01-01 01:01   META-INF/com/android/build/gradle/app-metadata.properties
+      120  1981-01-01 01:01   META-INF/version-control-info.textproto
+  2387432  1981-01-01 01:01   classes.dex
+      626  1981-01-01 01:01   kotlin-tooling-metadata.json
+     1022  1981-01-01 01:01   kotlin/annotation/annotation.kotlin_builtins
+     8625  1981-01-01 01:01   kotlin/collections/collections.kotlin_builtins
+     2882  1981-01-01 01:01   kotlin/concurrent/atomics/atomics.kotlin_builtins
+      139  1981-01-01 01:01   kotlin/coroutines/coroutines.kotlin_builtins
+      596  1981-01-01 01:01   kotlin/internal/internal.kotlin_builtins
+    30920  1981-01-01 01:01   kotlin/kotlin.kotlin_builtins
+     4353  1981-01-01 01:01   kotlin/ranges/ranges.kotlin_builtins
+     4859  1981-01-01 01:01   kotlin/reflect/reflect.kotlin_builtins
+     3208  1981-01-01 01:01   AndroidManifest.xml
+     8221  1981-01-01 01:01   res/o-.png
+      568  1981-01-01 01:01   resources.arsc
+     1740  1981-01-01 01:01   META-INF/CERT.SF
+     1298  1981-01-01 01:01   META-INF/CERT.RSA
+     1666  1981-01-01 01:01   META-INF/MANIFEST.MF
+---------                     -------
+  2458331                     18 files
