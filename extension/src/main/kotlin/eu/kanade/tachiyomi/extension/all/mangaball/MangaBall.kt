@@ -160,11 +160,17 @@ internal class MangaBallSource(
         }
 
         var results: List<SManga> = collected.values.toList()
-        results = filterByLanguages(results, includeLanguages, excludeLanguages)
-        if (preferences.getBoolean(PREF_ONLY_SOURCE_LANGUAGE, false)) {
-            results = filterByLanguages(results, listOf(lang), emptyList())
+        val onlySourceLanguage = preferences.getBoolean(PREF_ONLY_SOURCE_LANGUAGE, false)
+        if (includeLanguages.isNotEmpty() || excludeLanguages.isNotEmpty() || onlySourceLanguage) {
+            results = results.filter { manga ->
+                // An empty language list means the site said nothing, so fall back to this
+                // source's own language instead of dropping the entry.
+                val reported = manga.memoLanguages().ifEmpty { listOf(lang) }
+                languageMatches(reported, includeLanguages, excludeLanguages) &&
+                    (!onlySourceLanguage || languageMatches(reported, listOf(lang), emptyList()))
+            }
         }
-        results = orderResults(results, resultOrder, focusGenre, focusTag, includedTags)
+        results = applyOrdering(results, resultOrder, focusGenre, focusTag, includedTags)
 
         return MangasPage(results, hasNextPage)
     }
@@ -216,55 +222,24 @@ internal class MangaBallSource(
 
     // ------------------------------------------------------------- local logic
 
-    private fun filterByLanguages(
-        items: List<SManga>,
-        include: List<String>,
-        exclude: List<String>,
-    ): List<SManga> {
-        if (include.isEmpty() && exclude.isEmpty()) return items
-        val includeSet = include.flatMap { languageCandidates(it) }.toSet()
-        val excludeSet = exclude.flatMap { languageCandidates(it) }.toSet()
-        return items.filter { manga ->
-            val reported = manga.memoLanguages()
-            // When the site does not report languages, fall back to this source's language so
-            // the item is not dropped by an empty comparison.
-            val effective = if (reported.isEmpty()) {
-                languageCandidates(lang)
-            } else {
-                reported.flatMap { languageCandidates(it) }.toSet()
-            }
-            val matchesInclude = includeSet.isEmpty() || effective.any { it in includeSet }
-            val matchesExclude = excludeSet.none { it in effective }
-            matchesInclude && matchesExclude
-        }
-    }
-
-    private fun orderResults(
+    private fun applyOrdering(
         items: List<SManga>,
         order: String,
         focusGenre: String,
         focusTag: String,
         includedTags: List<String>,
-    ): List<SManga> = when (order) {
-        "title" -> items.sortedBy { it.title.lowercase() }
-        "views" -> items.sortedByDescending { it.memoViews() }
-        "chapters" -> items.sortedByDescending { it.memoChapterCount() }
-        "tag_match" -> rankBy(items) { manga -> includedTags.count { it in manga.memoTagIds() } }
-        "focus_genre" -> rankBy(items) { manga ->
-            val focus = if (focusGenre.isNotEmpty() && focusGenre in manga.memoTagIds()) 1_000 else 0
-            focus + includedTags.count { it in manga.memoTagIds() }
+    ): List<SManga> {
+        if (order == "server" || items.size < 2) return items
+        val rows = items.map { manga ->
+            RankingRow(
+                title = manga.title,
+                tagIds = manga.memoTagIds().toSet(),
+                views = manga.memoViews(),
+                chapters = manga.memoChapterCount(),
+            )
         }
-        "focus_tag" -> rankBy(items) { manga ->
-            val focus = if (focusTag.isNotEmpty() && focusTag in manga.memoTagIds()) 1_000 else 0
-            focus + includedTags.count { it in manga.memoTagIds() }
-        }
-        else -> items
+        return rankingPermutation(rows, order, focusGenre, focusTag, includedTags).map { items[it] }
     }
-
-    private fun rankBy(items: List<SManga>, score: (SManga) -> Int): List<SManga> =
-        items.withIndex()
-            .sortedWith(compareByDescending<IndexedValue<SManga>> { score(it.value) }.thenBy { it.index })
-            .map { it.value }
 
     // --------------------------------------------------------------- details
 
@@ -427,33 +402,6 @@ internal class MangaBallSource(
             .split(',')
             .map { it.trim() }
             .filter { it.isNotEmpty() }
-}
-
-/**
- * A language code can be written in several ways by the site (`es`, `es-419`, `es-la`, `jp`).
- * This returns every spelling that should be treated as the same language.
- */
-internal fun languageCandidates(code: String): Set<String> {
-    val lower = code.trim().lowercase()
-    if (lower.isEmpty()) return emptySet()
-    val base = lower.substringBefore('-')
-    val alias = when (base) {
-        "jp" -> "ja"
-        "kr" -> "ko"
-        "cn" -> "zh"
-        else -> base
-    }
-    return setOf(lower, base, alias)
-}
-
-/** Chapter languages that belong to a source language. */
-internal fun siteLanguages(code: String): Set<String> = when (code.lowercase()) {
-    "es" -> setOf("es", "es-419", "es-la", "es-es", "es-mx", "es-ar")
-    "pt-br" -> setOf("pt-br", "pt", "pt-pt")
-    "zh" -> setOf("zh", "zh-cn", "zh-hk", "zh-tw", "cn")
-    "ja" -> setOf("ja", "jp")
-    "ko" -> setOf("ko", "kr")
-    else -> setOf(code.lowercase())
 }
 
 private inline fun <reified T : Filter<*>> FilterList.ofType(): T? =

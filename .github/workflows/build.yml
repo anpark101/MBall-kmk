@@ -68,6 +68,11 @@ jobs:
           echo "KEY_ALIAS=mangaball" >> "$GITHUB_ENV"
           echo "KEY_PASSWORD=mangaball" >> "$GITHUB_ENV"
 
+      - name: Run tests
+        run: |
+          gradle :extension:testReleaseUnitTest --no-daemon --console=plain --info 2>&1 | tee test-output.log
+          grep -E "MangaBallLogicTest|tests completed|BUILD SUCCESSFUL" test-output.log | tail -n 5 || true
+
       - name: Build APK
         run: |
           set -o pipefail
@@ -79,6 +84,9 @@ jobs:
         run: |
           mkdir -p build-logs
           {
+            echo "### test failures"
+            grep -E "FAILED|MangaBallLogicTest" test-output.log 2>/dev/null | head -n 40 || true
+            echo
             echo "### compiler diagnostics"
             grep -n -E "^(e|w): " build-output.log | head -n 120 || true
             echo

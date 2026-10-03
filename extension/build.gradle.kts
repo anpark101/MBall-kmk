@@ -73,6 +73,10 @@ android {
     lint {
         abortOnError = false
     }
+
+    testOptions {
+        unitTests.isReturnDefaultValues = true
+    }
 }
 
 kotlin {
@@ -91,4 +95,8 @@ dependencies {
     compileOnly("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
     compileOnly("io.reactivex:rxjava:1.3.8")
     compileOnly("org.jsoup:jsoup:1.22.2")
+
+    // Unit tests: JUnit plus the same API stubs so filter classes can be constructed.
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("com.github.mihonapp:tachiyomix:1.6.0")
 }
