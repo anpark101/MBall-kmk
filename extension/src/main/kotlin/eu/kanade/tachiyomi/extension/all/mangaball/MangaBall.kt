@@ -40,6 +40,10 @@ private const val USER_AGENT =
 
 private val JSON_MEDIA_TYPE: MediaType = "application/json".toMediaType()
 
+private const val NOT_JSON_HELP =
+    "The server did not answer with JSON. If this repeats, turn on \"Use Cloudflare bypass client\" " +
+        "in this source's settings."
+
 // Preferences
 private const val PREF_BYPASS = "pref_cloudflare_client"
 private const val PREF_HIDE_NSFW = "pref_hide_nsfw"
@@ -199,8 +203,10 @@ internal class MangaBallSource(
         response.use {
             if (!it.isSuccessful) throw IOException("HTTP ${it.code}")
             val body = it.body?.string().orEmpty()
-            val root = body.parseJsonObject() ?: return emptyList<SManga>() to false
-            val data = root.arr("data") ?: return emptyList<SManga>() to false
+            val root = body.parseJsonObject()
+                ?: throw IOException(NOT_JSON_HELP)
+            val data = root.arr("data")
+                ?: throw IOException(root.string("message") ?: "Malformed API response")
             val items = data.mapNotNull { element -> element.asObject()?.toSManga() }
             val currentPage = root.obj("pagination")?.int("page")?.toInt() ?: 1
             val totalPages = root.obj("pagination")?.int("total_pages")?.toInt() ?: currentPage
@@ -329,6 +335,7 @@ internal class MangaBallSource(
             val body = it.body?.string().orEmpty()
             val root = body.parseJsonObject() ?: throw IOException("Empty response")
             val pages = root.obj("data")?.obj("chapter")?.strings("pages").orEmpty()
+            if (pages.isEmpty()) throw IOException("This chapter has no readable pages")
             return pages.mapIndexed { index, url -> Page(index, url, url) }
         }
     }
