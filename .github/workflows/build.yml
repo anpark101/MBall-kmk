@@ -114,7 +114,14 @@ jobs:
             echo
             echo "## Manifest meta-data"
             "$TOOLS/aapt2" dump xmltree --file AndroidManifest.xml "$apk" \
-              | grep -A 4 "E: meta-data" | grep -E "E: meta-data|A: android:(name|value)" | head -n 60
+              | grep -A 2 "E: meta-data" | head -n 60
+            echo
+            echo "## Extension classes present in classes.dex"
+            unzip -p "$apk" classes.dex > /tmp/classes.dex
+            strings /tmp/classes.dex | grep -E "MangaBall(Factory|Source|Languages|Catalog|Filters|Query)$" | sort -u
+            echo
+            echo "## Source factory entry point"
+            strings /tmp/classes.dex | grep -c "eu/kanade/tachiyomi/extension/all/mangaball" || true
             echo
             echo "## Archive contents"
             unzip -l "$apk" | head -n 30
