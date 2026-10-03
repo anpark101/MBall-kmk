@@ -1,6 +1,6 @@
 # APK verification
 
-File: tachiyomi-all.mangaball-enhanced-v1.6.5.apk  (738250 bytes)
+File: tachiyomi-all.mangaball-enhanced-v1.6.6.apk  (738235 bytes)
 
 ## Signing certificate
 V2 Signer: certificate DN: CN=MangaBall Enhanced, OU=Extensions, O=GitHub, C=US
@@ -11,7 +11,7 @@ WARNING: META-INF/com/android/build/gradle/app-metadata.properties not protected
 WARNING: META-INF/version-control-info.textproto not protected by signature. Unauthorized modifications to this JAR entry will not be detected. Delete or move the entry outside of META-INF/.
 
 ## Application info
-package: name='eu.kanade.tachiyomi.extension.all.mangaball' versionCode='5' versionName='1.6.5' platformBuildVersionName='15' platformBuildVersionCode='35' compileSdkVersion='35' compileSdkVersionCodename='15'
+package: name='eu.kanade.tachiyomi.extension.all.mangaball' versionCode='6' versionName='1.6.6' platformBuildVersionName='15' platformBuildVersionCode='35' compileSdkVersion='35' compileSdkVersionCodename='15'
 targetSdkVersion:'35'
 application-label:'Tachiyomi: MangaBall Enhanced'
 application-icon-640:'res/o-.png'
@@ -19,16 +19,42 @@ application: label='Tachiyomi: MangaBall Enhanced' icon='res/o-.png'
 
 ## Manifest meta-data
           E: meta-data (line=22)
+            A: http://schemas.android.com/apk/res/android:name(0x01010003)="tachiyomix.name" (Raw: "tachiyomix.name")
+            A: http://schemas.android.com/apk/res/android:value(0x01010024)="MangaBall Enhanced" (Raw: "MangaBall Enhanced")
           E: meta-data (line=25)
+            A: http://schemas.android.com/apk/res/android:name(0x01010003)="tachiyomix.contentWarning" (Raw: "tachiyomix.contentWarning")
+            A: http://schemas.android.com/apk/res/android:value(0x01010024)=1
           E: meta-data (line=28)
+            A: http://schemas.android.com/apk/res/android:name(0x01010003)="tachiyomix.extensionLib" (Raw: "tachiyomix.extensionLib")
+            A: http://schemas.android.com/apk/res/android:value(0x01010024)=1.6
           E: meta-data (line=33)
+            A: http://schemas.android.com/apk/res/android:name(0x01010003)="tachiyomi.extension.class" (Raw: "tachiyomi.extension.class")
+            A: http://schemas.android.com/apk/res/android:value(0x01010024)=".MangaBallFactory" (Raw: ".MangaBallFactory")
           E: meta-data (line=36)
+            A: http://schemas.android.com/apk/res/android:name(0x01010003)="tachiyomi.extension.factory" (Raw: "tachiyomi.extension.factory")
+            A: http://schemas.android.com/apk/res/android:value(0x01010024)="eu.kanade.tachiyomi.extension.all.mangaball.MangaBallFactory" (Raw: "eu.kanade.tachiyomi.extension.all.mangaball.MangaBallFactory")
           E: meta-data (line=41)
+            A: http://schemas.android.com/apk/res/android:name(0x01010003)="tachiyomi.extension.name" (Raw: "tachiyomi.extension.name")
+            A: http://schemas.android.com/apk/res/android:value(0x01010024)="MangaBall Enhanced" (Raw: "MangaBall Enhanced")
           E: meta-data (line=44)
+            A: http://schemas.android.com/apk/res/android:name(0x01010003)="tachiyomi.extension.nsfw" (Raw: "tachiyomi.extension.nsfw")
+            A: http://schemas.android.com/apk/res/android:value(0x01010024)=1
           E: meta-data (line=47)
+            A: http://schemas.android.com/apk/res/android:name(0x01010003)="tachiyomi.extension.lib" (Raw: "tachiyomi.extension.lib")
+            A: http://schemas.android.com/apk/res/android:value(0x01010024)=1.6
+
+## Extension classes present in classes.dex
+;eu.kanade.tachiyomi.extension.all.mangaball.MangaBallSource
+eu/kanade/tachiyomi/extension/all/mangaball/MangaBallCatalog
+eu/kanade/tachiyomi/extension/all/mangaball/MangaBallFactory
+eu/kanade/tachiyomi/extension/all/mangaball/MangaBallFilters
+eu/kanade/tachiyomi/extension/all/mangaball/MangaBallSource
+
+## Source factory entry point
+108
 
 ## Archive contents
-Archive:  extension/build/outputs/apk/release/tachiyomi-all.mangaball-enhanced-v1.6.5.apk
+Archive:  extension/build/outputs/apk/release/tachiyomi-all.mangaball-enhanced-v1.6.6.apk
   Length      Date    Time    Name
 ---------  ---------- -----   ----
        56  1981-01-01 01:01   META-INF/com/android/build/gradle/app-metadata.properties
