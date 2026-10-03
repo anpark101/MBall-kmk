@@ -1,6 +1,6 @@
 # APK verification
 
-File: tachiyomi-all.mangaball-enhanced-v1.6.7.apk  (738350 bytes)
+File: tachiyomi-all.mangaball-enhanced-v1.6.8.apk  (738357 bytes)
 
 ## Signing certificate
 V2 Signer: certificate DN: CN=MangaBall Enhanced, OU=Extensions, O=GitHub, C=US
@@ -11,7 +11,7 @@ WARNING: META-INF/com/android/build/gradle/app-metadata.properties not protected
 WARNING: META-INF/version-control-info.textproto not protected by signature. Unauthorized modifications to this JAR entry will not be detected. Delete or move the entry outside of META-INF/.
 
 ## Application info
-package: name='eu.kanade.tachiyomi.extension.all.mangaball' versionCode='7' versionName='1.6.7' platformBuildVersionName='15' platformBuildVersionCode='35' compileSdkVersion='35' compileSdkVersionCodename='15'
+package: name='eu.kanade.tachiyomi.extension.all.mangaball' versionCode='8' versionName='1.6.8' platformBuildVersionName='15' platformBuildVersionCode='35' compileSdkVersion='35' compileSdkVersionCodename='15'
 targetSdkVersion:'35'
 application-label:'Tachiyomi: MangaBall Enhanced'
 application-icon-640:'res/o-.png'
@@ -54,7 +54,7 @@ eu/kanade/tachiyomi/extension/all/mangaball/MangaBallSource
 108
 
 ## Archive contents
-Archive:  extension/build/outputs/apk/release/tachiyomi-all.mangaball-enhanced-v1.6.7.apk
+Archive:  extension/build/outputs/apk/release/tachiyomi-all.mangaball-enhanced-v1.6.8.apk
   Length      Date    Time    Name
 ---------  ---------- -----   ----
        56  1981-01-01 01:01   META-INF/com/android/build/gradle/app-metadata.properties
