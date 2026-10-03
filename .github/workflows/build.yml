@@ -112,6 +112,9 @@ jobs:
           {
             echo "# APK verification"
             echo
+            echo "## Unit tests"
+            grep -h -o 'tests="[0-9]*" skipped="[0-9]*" failures="[0-9]*" errors="[0-9]*"' \
+              extension/build/test-results/testReleaseUnitTest/*.xml 2>/dev/null | head -n 5 || echo "no test report found"
             echo "File: $(basename "$apk")  ($(stat -c %s "$apk") bytes)"
             echo
             echo "## Signing certificate"
