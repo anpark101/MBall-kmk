@@ -27,11 +27,44 @@ page reading, 40 language variants, and a few quality-of-life switches.
    allow installation for your browser/file manager when it asks. (The APK is signed, but it is
    not signed by the official Komikku key, so Android always shows this warning.)
 3. **Open Komikku** → `More` (⋮) → **Extensions**.
-4. Open the **Untrusted** tab, find **MangaBall Enhanced** and tap the **shield** icon.
+4. Find **MangaBall Enhanced** in the **Installed** list (yes — Installed) and
+   **tap the shield ✓ button on its right**, then confirm **Trust**.
    This is required once per install — the app does not know the key this APK was signed with.
-5. Done. In Komikku go to **Browse**, and you will find `MangaBall (English)`,
+5. The moment you tap Trust, the app loads the extension and its 40 sources are created.
+   Nothing else is needed. If afterwards Browse still shows no MangaBall source, that is the
+   app's *Languages* filter — see [Step 3b](#step-3b---the-two-app-side-filters-that-hide-sources-not-the-extension).
+6. Done. In Komikku go to **Browse**, and you will find `MangaBall (English)`,
    `MangaBall (Español)`, `MangaBall (Français)` … pick the one you want and optionally pin it
    to the top.
+
+> ### ⚠️ The "it installed but there are no sources and no languages" trap
+>
+> A hand-installed APK is **untrusted**, and Komikku/Mihon deliberately create **no sources at
+> all** for an untrusted extension:
+>
+> ```kotlin
+> } else if (!trustExtension.isTrusted(pkgInfo, signatures)) {
+>     logcat(LogPriority.WARN) { "Extension $pkgName isn't trusted" }
+>     return LoadResult.Untrusted(extension)      // <-- source creation never runs
+> }
+> ...
+> val sources = appInfo.metaData.getString(METADATA_SOURCE_CLASS)!!  // only for trusted extensions
+> ```
+>
+> So this is what you see, and **it is not a bug in the extension**:
+>
+> | Where you look | What an untrusted extension shows |
+> | --- | --- |
+> | *More → Extensions* | The card **is** listed, under **Installed**, with the word **Untrusted** under the name and a shield ✓ button on the right |
+> | The card's language list | **Empty** — there are no sources yet, so no `English` / `Español` / … appears |
+> | Browse → Sources | **Nothing** — no `MangaBall (English)`, no diagnostics source |
+>
+> The fix is one tap: **tap the card (or its shield ✓) → Trust**. Komikku then reloads the
+> extension, creates the 40 sources and registers them immediately — no app restart needed.
+>
+> **Every update needs that tap again.** Trust is remembered as
+> `packageName:versionCode:fingerprint`, so a new versionCode (a new APK) is untrusted again
+> until you tap the shield once more.
 
 ### Updating later
 
@@ -186,6 +219,20 @@ app first.
 > **Heads up when updating:** install the new APK over the old one — the package name and
 > signing key are unchanged, so it updates in place.
 
+### The real cause of "the extension loaded but it has no English version" (v1.6.13)
+
+This turned out **not** to be the content warning, and not a build failure inside the extension.
+It is the reader app's extension **trust** gate, quoted at the top of this README:
+`ExtensionLoader` returns `LoadResult.Untrusted` *before* it ever calls
+`SourceFactory.createSources()`, so an untrusted extension is listed (name + version, no
+languages) while producing zero sources. Hand-installed APKs are always untrusted until the
+shield ✓ is tapped once per versionCode.
+
+A second, smaller gate applies afterwards, once the sources exist: Browse only shows sources
+whose `lang` is in *Settings → Browse → Languages*. English is enabled by default
+(`getDefaultEnabledLanguages() = {"all", "en", Locale.getDefault().language}`), so a normal
+install needs no change there.
+
 ---
 
 ## 9. Notes
@@ -201,9 +248,17 @@ app first.
   official Keiyoushi *Manga Ball* extension (same package name, different key), Android will
   refuse the second one — uninstall one before installing the other.
 
-## 10. The extension is not listed anywhere (not even under Untrusted)
+## 10. The extension is listed but has no sources / is not listed at all
 
 Work through this **in order** — each step tells you what the next one means.
+
+### Step 0 - Is the card labelled *Untrusted*?
+
+*More → Extensions → Installed*: if the MangaBall Enhanced card has the word **Untrusted**
+under its name and a shield ✓ button, **that is the whole problem**. Untrusted extensions are
+never given sources, so Browse stays empty and the card shows no languages. Tap the card → tap
+**Trust**. The sources appear immediately. Repeat this after every update (trust is stored per
+versionCode).
 
 ### Step 1 - Uninstall the old extension first
 
@@ -225,8 +280,9 @@ that is the entire problem, and no reader-app setting will help.
 
 ### Step 3 - Look in Komikku/Mihon
 
-*More → Extensions*:
-- **Untrusted** tab → tap the shield next to *MangaBall Enhanced*.
+*More → Extensions* (Komikku shows untrusted extensions **inside the Installed list**, marked
+*Untrusted* — there is no separate tab):
+- Tap the card or its shield ✓ → **Trust**, then look in Browse again.
 - If it is not in *Untrusted* and not in *Installed*, check these:
 
 | Possible cause | What to do |
