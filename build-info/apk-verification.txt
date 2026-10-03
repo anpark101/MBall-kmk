@@ -1,6 +1,6 @@
 # APK verification
 
-File: tachiyomi-all.mangaball-enhanced-v1.6.6.apk  (738235 bytes)
+File: tachiyomi-all.mangaball-enhanced-v1.6.7.apk  (738350 bytes)
 
 ## Signing certificate
 V2 Signer: certificate DN: CN=MangaBall Enhanced, OU=Extensions, O=GitHub, C=US
@@ -11,7 +11,7 @@ WARNING: META-INF/com/android/build/gradle/app-metadata.properties not protected
 WARNING: META-INF/version-control-info.textproto not protected by signature. Unauthorized modifications to this JAR entry will not be detected. Delete or move the entry outside of META-INF/.
 
 ## Application info
-package: name='eu.kanade.tachiyomi.extension.all.mangaball' versionCode='6' versionName='1.6.6' platformBuildVersionName='15' platformBuildVersionCode='35' compileSdkVersion='35' compileSdkVersionCodename='15'
+package: name='eu.kanade.tachiyomi.extension.all.mangaball' versionCode='7' versionName='1.6.7' platformBuildVersionName='15' platformBuildVersionCode='35' compileSdkVersion='35' compileSdkVersionCodename='15'
 targetSdkVersion:'35'
 application-label:'Tachiyomi: MangaBall Enhanced'
 application-icon-640:'res/o-.png'
@@ -54,12 +54,12 @@ eu/kanade/tachiyomi/extension/all/mangaball/MangaBallSource
 108
 
 ## Archive contents
-Archive:  extension/build/outputs/apk/release/tachiyomi-all.mangaball-enhanced-v1.6.6.apk
+Archive:  extension/build/outputs/apk/release/tachiyomi-all.mangaball-enhanced-v1.6.7.apk
   Length      Date    Time    Name
 ---------  ---------- -----   ----
        56  1981-01-01 01:01   META-INF/com/android/build/gradle/app-metadata.properties
       120  1981-01-01 01:01   META-INF/version-control-info.textproto
-  2387432  1981-01-01 01:01   classes.dex
+  2387672  1981-01-01 01:01   classes.dex
       626  1981-01-01 01:01   kotlin-tooling-metadata.json
      1022  1981-01-01 01:01   kotlin/annotation/annotation.kotlin_builtins
      8625  1981-01-01 01:01   kotlin/collections/collections.kotlin_builtins
@@ -76,4 +76,4 @@ Archive:  extension/build/outputs/apk/release/tachiyomi-all.mangaball-enhanced-v
      1298  1981-01-01 01:01   META-INF/CERT.RSA
      1666  1981-01-01 01:01   META-INF/MANIFEST.MF
 ---------                     -------
-  2458331                     18 files
+  2458571                     18 files
