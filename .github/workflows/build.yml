@@ -5,6 +5,13 @@ on:
     branches:
       - main
       - 'arena/**'
+    # Documentation-only commits must not publish a new APK: a new versionCode also invalidates
+    # the user's one-tap "Trust" in the reader app, so it is not free.
+    paths-ignore:
+      - '**.md'
+      - 'build-info/**'
+      - 'build-logs/**'
+      - 'tools/**'
   workflow_dispatch:
 
 permissions:
