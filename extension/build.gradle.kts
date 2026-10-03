@@ -10,7 +10,8 @@ plugins {
 // ---------------------------------------------------------------------------
 val extName = "MangaBall Enhanced"
 val extClass = ".MangaBallFactory"
-val extVersionCode = 1
+// CI passes an increasing build number so each release can update the previous one.
+val extVersionCode = (System.getenv("EXT_VERSION_CODE") ?: "1").toInt()
 val libVersion = "1.6" // API level of the extension library this APK is built against
 // The site carries adult titles, so the extension is flagged as mixed content.
 val contentWarning = 1

@@ -10,6 +10,9 @@ on:
 permissions:
   contents: write
 
+env:
+  EXT_VERSION_CODE: ${{ github.run_number }}
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -28,31 +31,37 @@ jobs:
 
       - name: Show Android SDK
         run: |
-          echo "ANDROID_HOME=${ANDROID_HOME:-unset}"
-          echo "ANDROID_SDK_ROOT=${ANDROID_SDK_ROOT:-unset}"
           if [ -z "${ANDROID_HOME:-}" ]; then echo "ANDROID_HOME=/usr/local/lib/android/sdk" >> "$GITHUB_ENV"; fi
           SDK="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
-          ls "$SDK" || true
-          echo "--- platforms ---"; ls "$SDK/platforms" || true
-          echo "--- build-tools ---"; ls "$SDK/build-tools" || true
+          echo "sdk=$SDK"
+          ls "$SDK/build-tools" || true
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: 8.10.2
 
+      # The keystore is stored in the repository so every release keeps the same signature.
+      # Android refuses to update an installed app whose signature changed.
       - name: Prepare signing key
         run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           mkdir -p ci
           if [ ! -f ci/mangaball.jks ]; then
-            echo "Generating a new signing key (first run)"
+            echo "Generating a new signing key"
             keytool -genkeypair -v \
               -keystore ci/mangaball.jks \
               -alias mangaball \
               -keyalg RSA -keysize 2048 -validity 10000 \
               -storepass mangaball -keypass mangaball \
               -dname "CN=MangaBall Enhanced, OU=Extensions, O=GitHub, C=US"
-            echo "NEW_KEYSTORE=true" >> "$GITHUB_ENV"
+            git add -f ci/mangaball.jks
+            git commit -m "chore: add signing keystore [skip ci]"
+            git pull --rebase --autostash || true
+            git push || true
+          else
+            echo "Reusing the keystore from the repository"
           fi
           echo "KEYSTORE_FILE=$PWD/ci/mangaball.jks" >> "$GITHUB_ENV"
           echo "KEYSTORE_PASSWORD=mangaball" >> "$GITHUB_ENV"
@@ -74,65 +83,88 @@ jobs:
             grep -n -E "^(e|w): " build-output.log | head -n 120 || true
             echo
             echo "### failure summary"
-            sed -n '/What went wrong/,/^\* Try:/p' build-output.log | head -n 80 || true
-            echo
-            echo "### last 60 lines"
-            tail -n 60 build-output.log || true
+            sed -n '/What went wrong/,/^\\* Try:/p' build-output.log | head -n 80 || true
           } > build-logs/last-build.txt
-          head -n 60 build-logs/last-build.txt
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -f build-logs/last-build.txt
           git commit -m "chore: build log [skip ci]" || true
           git pull --rebase --autostash || true
           git push || true
 
-      - name: Locate APK
+      - name: Verify APK
         id: apk
         if: success()
         run: |
-          find extension/build/outputs/apk -name "*.apk" -printf "%p (%s bytes)\n" || true
           apk=$(find extension/build/outputs/apk -name "*.apk" ! -name "*unsigned*" | head -n 1)
-          if [ -z "$apk" ]; then
-            echo "No signed APK produced"; exit 1
-          fi
+          if [ -z "$apk" ]; then echo "No signed APK produced"; exit 1; fi
           echo "path=$apk" >> "$GITHUB_OUTPUT"
           echo "name=$(basename "$apk")" >> "$GITHUB_OUTPUT"
 
-      - name: Print certificate fingerprint
-        if: success()
-        run: |
-          tools=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -n 1)
-          "$tools/apksigner" verify --print-certs "${{ steps.apk.outputs.path }}" | head -n 5
+          TOOLS="$(ls -d "${ANDROID_HOME:-/usr/local/lib/android/sdk}"/build-tools/* | sort -V | tail -n 1)"
+          mkdir -p build-info
+          {
+            echo "# APK verification"
+            echo
+            echo "File: $(basename "$apk")  ($(stat -c %s "$apk") bytes)"
+            echo
+            echo "## Signing certificate"
+            "$TOOLS/apksigner" verify --print-certs "$apk" | head -n 6
+            echo
+            echo "## Application info"
+            "$TOOLS/aapt2" dump badging "$apk" | grep -E "^(package|application|sdkVersion|targetSdkVersion|uses-feature)" | head -n 10
+            echo
+            echo "## Manifest meta-data"
+            "$TOOLS/aapt2" dump xmltree --file AndroidManifest.xml "$apk" \
+              | grep -A 4 "E: meta-data" | grep -E "E: meta-data|A: android:(name|value)" | head -n 60
+            echo
+            echo "## Archive contents"
+            unzip -l "$apk" | head -n 30
+          } > build-info/apk-verification.txt
+          cat build-info/apk-verification.txt
 
       - name: Upload APK as workflow artifact
         if: success()
         uses: actions/upload-artifact@v4
         with:
           name: mangaball-enhanced-apk
-          path: ${{ steps.apk.outputs.path }}
+          path: |
+            ${{ steps.apk.outputs.path }}
+            build-info/apk-verification.txt
+
+      - name: Publish build info
+        if: success()
+        continue-on-error: true
+        run: |
+          git add -f build-info/apk-verification.txt
+          git commit -m "chore: apk verification for v1.6.${EXT_VERSION_CODE} [skip ci]" || true
+          git pull --rebase --autostash || true
+          git push || true
 
       - name: Publish release
         if: success()
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.6.1
-          name: MangaBall Enhanced — v1.6.1
+          tag_name: v1.6.${{ github.run_number }}
+          name: MangaBall Enhanced — v1.6.${{ github.run_number }}
           body: |
             Enhanced MangaBall extension for Komikku.
 
-            **Install:** download the APK below, open it on your phone, allow installs from this
-            source, then open Komikku → More → Extensions → Untrusted → trust *MangaBall Enhanced*.
+            **Install (phone)**
+            1. Download the APK below.
+            2. Open it, and allow installs from this source if Android asks.
+            3. Open Komikku → **More → Extensions → Untrusted** → tap the shield next to *MangaBall Enhanced*.
+            4. Komikku → **Browse** → pick a **MangaBall (…)** source → **Filter** to use the enhanced search.
 
-            **Features**
+            **What it does**
 
-            - Enhanced search with an inline query language
-              (`tag:romance -tag:ecchi sort:views status:ongoing pages:3`)
-            - Sort by latest update, views, rating, newest, title
+            - Enhanced search with an inline query language, e.g.
+              `naruto tag:action -tag:ecchi sort:views order:desc status:ongoing pages:3`
+            - Sort by latest update, views, rating, newest or title
             - Local ordering by genre, by tag, by tag match, by title, by views, by chapter count
-            - Include **or** exclude any genre / theme / format tag, with AND / OR tag logic
-            - Language filter that can include and exclude languages
-            - Optional: hide 18+ titles, hide chapters of specific scanlators, merge more pages per search
+            - Include **or** exclude any genre / theme / format / content tag, with AND / OR tag logic
+            - Language include/exclude filter and an extra-keyword field
+            - Optional: hide 18+ titles, hide chapters of a specific scanlator, merge more pages per search
+
+            Full guide: see `README.md` in the repository.
 
             Site: https://mangaball.com
           files: ${{ steps.apk.outputs.path }}
