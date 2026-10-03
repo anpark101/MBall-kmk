@@ -62,14 +62,24 @@ jobs:
       - name: Build APK
         run: |
           set -o pipefail
-          gradle :extension:assembleRelease --no-daemon --stacktrace 2>&1 | tee build-output.log
+          gradle :extension:assembleRelease --no-daemon --console=plain 2>&1 | tee build-output.log
 
       - name: Save build log on failure
         if: failure()
         continue-on-error: true
         run: |
           mkdir -p build-logs
-          tail -c 40000 build-output.log > build-logs/last-build.txt || true
+          {
+            echo "### compiler diagnostics"
+            grep -n -E "^(e|w): " build-output.log | head -n 120 || true
+            echo
+            echo "### failure summary"
+            sed -n '/What went wrong/,/^\* Try:/p' build-output.log | head -n 80 || true
+            echo
+            echo "### last 60 lines"
+            tail -n 60 build-output.log || true
+          } > build-logs/last-build.txt
+          head -n 60 build-logs/last-build.txt
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -f build-logs/last-build.txt
