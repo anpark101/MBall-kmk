@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - '.github/workflows/probe.yml'
+      - 'tools/probe/**'
   workflow_dispatch:
 
 permissions:
@@ -15,70 +16,31 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: Install curl_cffi
-        run: pip install --quiet curl_cffi
-
-      - name: Impersonation test
-        continue-on-error: true
+      - name: Environment
         run: |
           mkdir -p probe-results
-          python3 - <<'PY' > probe-results/10-impersonate.txt 2>&1
-          from curl_cffi import requests
-          targets = [
-              ("chrome", "https://mangaball.com/api/v1/title/search-advanced?page=1&limit=1"),
-              ("chrome124", "https://mangaball.com/api/v1/title/search-advanced?page=1&limit=1"),
-              ("safari17_0", "https://mangaball.com/api/v1/title/search-advanced?page=1&limit=1"),
-              ("chrome_android", "https://mangaball.com/api/v1/title/search-advanced?page=1&limit=1"),
-          ]
-          for imp, url in targets:
-              try:
-                  r = requests.get(url, impersonate=imp, timeout=45,
-                                   headers={"Accept": "application/json, text/plain, */*",
-                                            "Accept-Language": "en-US,en;q=0.9",
-                                            "Referer": "https://mangaball.com/search-advanced"})
-                  print(f"### {imp} -> {r.status_code} len={len(r.content)}")
-                  print(r.text[:300].replace("\n", " "))
-              except Exception as e:
-                  print(f"### {imp} -> ERROR {type(e).__name__}: {e}")
-              print("---")
-          # plain requests for comparison
-          try:
-              r = requests.get("https://mangaball.com/api/v1/title/search-advanced?page=1&limit=1", timeout=45)
-              print(f"### plain -> {r.status_code}")
-          except Exception as e:
-              print(f"### plain -> ERROR {e}")
-          PY
-          cat probe-results/10-impersonate.txt
+          {
+            echo "python: $(python3 -V 2>&1)"
+            echo "pip: $(python3 -m pip -V 2>&1)"
+            echo "--- installing curl_cffi ---"
+            python3 -m pip install --quiet curl_cffi 2>&1
+            echo "install exit: $?"
+            python3 -c "import curl_cffi; print('curl_cffi', curl_cffi.__version__)" 2>&1
+          } > probe-results/00-env.txt 2>&1
+          cat probe-results/00-env.txt
 
-      - name: Session based access (HTML first, then API)
-        continue-on-error: true
+      - name: Probe routes
         run: |
-          python3 - <<'PY' > probe-results/11-session.txt 2>&1
-          from curl_cffi import requests
-          s = requests.Session(impersonate="chrome")
-          try:
-              home = s.get("https://mangaball.com/", timeout=45)
-              print("home:", home.status_code, len(home.content))
-              print("cf cookies:", [c.name for c in s.cookies.jar])
-              r = s.get("https://mangaball.com/api/v1/title/search-advanced?page=1&limit=1", timeout=45,
-                        headers={"Accept": "application/json, text/plain, */*", "Referer": "https://mangaball.com/"})
-              print("api:", r.status_code, len(r.content))
-              print(r.text[:400].replace("\n", " "))
-          except Exception as e:
-              print("ERROR", type(e).__name__, e)
-          PY
-          cat probe-results/11-session.txt
+          python3 tools/probe/probe_http.py > probe-results/10-routes.txt 2>&1
+          tail -60 probe-results/10-routes.txt
 
       - name: Commit results
-        continue-on-error: true
+        if: always()
         run: |
           git config user.name "probe-bot"
           git config user.email "probe-bot@users.noreply.github.com"
-          git add -A probe-results
-          git commit -m "chore: probe results [skip ci]" || echo "nothing to commit"
-          git pull --rebase --autostash origin "${GITHUB_REF_NAME}"
-          git push origin "HEAD:${GITHUB_REF_NAME}"
+          git add -f probe-results
+          git commit -m "chore: probe results [skip ci]" || true
+          git pull --rebase --autostash origin "${GITHUB_REF_NAME}" || true
+          git push origin "HEAD:${GITHUB_REF_NAME}" || true
+          ls -la probe-results || true
