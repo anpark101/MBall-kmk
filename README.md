@@ -148,6 +148,7 @@ in about three minutes.
 | Symptom | Fix |
 | --- | --- |
 | Source shows a red *untrusted* marker | Extensions → Untrusted → tap the shield next to *MangaBall Enhanced*. |
+| Source is not listed in Browse at all | The site carries adult titles, so the extension is flagged as mixed content. Enable the NSFW/adult-sources toggle in Komikku's settings (Settings → Browse) and reopen Komikku. |
 | Search returns nothing | Clear the included tags / switch Tag mode from AND to OR — very specific combinations genuinely have no results. |
 | "HTTP 403" or a Cloudflare page | Enable **Use Cloudflare bypass client** in the source settings. |
 | "App not installed" when updating | You are installing an APK with a different signature — uninstall the old extension first (the library entries can be re-added afterwards). |
