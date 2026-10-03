@@ -1,6 +1,6 @@
 # APK verification
 
-File: tachiyomi-all.mangaball-enhanced-v1.6.9.apk  (741933 bytes)
+File: tachiyomi-all.mangaball-enhanced-v1.6.10.apk  (741928 bytes)
 
 ## Signing certificate
 V2 Signer: certificate DN: CN=MangaBall Enhanced, OU=Extensions, O=GitHub, C=US
@@ -11,7 +11,7 @@ WARNING: META-INF/com/android/build/gradle/app-metadata.properties not protected
 WARNING: META-INF/version-control-info.textproto not protected by signature. Unauthorized modifications to this JAR entry will not be detected. Delete or move the entry outside of META-INF/.
 
 ## Application info
-package: name='eu.kanade.tachiyomi.extension.all.mangaball' versionCode='9' versionName='1.6.9' platformBuildVersionName='15' platformBuildVersionCode='35' compileSdkVersion='35' compileSdkVersionCodename='15'
+package: name='eu.kanade.tachiyomi.extension.all.mangaball' versionCode='10' versionName='1.6.10' platformBuildVersionName='15' platformBuildVersionCode='35' compileSdkVersion='35' compileSdkVersionCodename='15'
 targetSdkVersion:'35'
 application-label:'Tachiyomi: MangaBall Enhanced'
 application-icon-640:'res/o-.png'
@@ -23,7 +23,7 @@ application: label='Tachiyomi: MangaBall Enhanced' icon='res/o-.png'
             A: http://schemas.android.com/apk/res/android:value(0x01010024)="MangaBall Enhanced" (Raw: "MangaBall Enhanced")
           E: meta-data (line=25)
             A: http://schemas.android.com/apk/res/android:name(0x01010003)="tachiyomix.contentWarning" (Raw: "tachiyomix.contentWarning")
-            A: http://schemas.android.com/apk/res/android:value(0x01010024)=1
+            A: http://schemas.android.com/apk/res/android:value(0x01010024)=0
           E: meta-data (line=28)
             A: http://schemas.android.com/apk/res/android:name(0x01010003)="tachiyomix.extensionLib" (Raw: "tachiyomix.extensionLib")
             A: http://schemas.android.com/apk/res/android:value(0x01010024)=1.6
@@ -38,7 +38,7 @@ application: label='Tachiyomi: MangaBall Enhanced' icon='res/o-.png'
             A: http://schemas.android.com/apk/res/android:value(0x01010024)="MangaBall Enhanced" (Raw: "MangaBall Enhanced")
           E: meta-data (line=44)
             A: http://schemas.android.com/apk/res/android:name(0x01010003)="tachiyomi.extension.nsfw" (Raw: "tachiyomi.extension.nsfw")
-            A: http://schemas.android.com/apk/res/android:value(0x01010024)=1
+            A: http://schemas.android.com/apk/res/android:value(0x01010024)=0
           E: meta-data (line=47)
             A: http://schemas.android.com/apk/res/android:name(0x01010003)="tachiyomi.extension.lib" (Raw: "tachiyomi.extension.lib")
             A: http://schemas.android.com/apk/res/android:value(0x01010024)=1.6
@@ -54,12 +54,12 @@ eu/kanade/tachiyomi/extension/all/mangaball/MangaBallSource
 122
 
 ## Archive contents
-Archive:  extension/build/outputs/apk/release/tachiyomi-all.mangaball-enhanced-v1.6.9.apk
+Archive:  extension/build/outputs/apk/release/tachiyomi-all.mangaball-enhanced-v1.6.10.apk
   Length      Date    Time    Name
 ---------  ---------- -----   ----
        56  1981-01-01 01:01   META-INF/com/android/build/gradle/app-metadata.properties
       120  1981-01-01 01:01   META-INF/version-control-info.textproto
-  2398148  1981-01-01 01:01   classes.dex
+  2398128  1981-01-01 01:01   classes.dex
       626  1981-01-01 01:01   kotlin-tooling-metadata.json
      1022  1981-01-01 01:01   kotlin/annotation/annotation.kotlin_builtins
      8625  1981-01-01 01:01   kotlin/collections/collections.kotlin_builtins
@@ -69,11 +69,11 @@ Archive:  extension/build/outputs/apk/release/tachiyomi-all.mangaball-enhanced-v
     30920  1981-01-01 01:01   kotlin/kotlin.kotlin_builtins
      4353  1981-01-01 01:01   kotlin/ranges/ranges.kotlin_builtins
      4859  1981-01-01 01:01   kotlin/reflect/reflect.kotlin_builtins
-     3208  1981-01-01 01:01   AndroidManifest.xml
+     3212  1981-01-01 01:01   AndroidManifest.xml
      8221  1981-01-01 01:01   res/o-.png
       568  1981-01-01 01:01   resources.arsc
      1740  1981-01-01 01:01   META-INF/CERT.SF
      1298  1981-01-01 01:01   META-INF/CERT.RSA
      1666  1981-01-01 01:01   META-INF/MANIFEST.MF
 ---------                     -------
-  2469047                     18 files
+  2469031                     18 files
