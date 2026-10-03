@@ -1,0 +1,52 @@
+## Search params
+### baseline  [https://mangaball.com/api/v1/title/search-advanced?page=1&limit=5&]
+RAW: <!DOCTYPE html><html lang="en-US"><head><title>Just a moment...</title><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=Edge"><meta name="robots" content="noindex,nofollow"><meta name="viewport" content="width=device-width,initial-scal
+---
+### keyword=naruto  [https://mangaball.com/api/v1/title/search-advanced?page=1&limit=5&keyword=naruto]
+RAW: <!DOCTYPE html><html lang="en-US"><head><title>Just a moment...</title><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=Edge"><meta name="robots" content="noindex,nofollow"><meta name="viewport" content="width=device-width,initial-scal
+---
+### search=naruto  [https://mangaball.com/api/v1/title/search-advanced?page=1&limit=5&search=naruto]
+RAW: <!DOCTYPE html><html lang="en-US"><head><title>Just a moment...</title><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=Edge"><meta name="robots" content="noindex,nofollow"><meta name="viewport" content="width=device-width,initial-scal
+---
+### q=naruto  [https://mangaball.com/api/v1/title/search-advanced?page=1&limit=5&q=naruto]
+RAW: <!DOCTYPE html><html lang="en-US"><head><title>Just a moment...</title><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=Edge"><meta name="robots" content="noindex,nofollow"><meta name="viewport" content="width=device-width,initial-scal
+---
+### name=naruto  [https://mangaball.com/api/v1/title/search-advanced?page=1&limit=5&name=naruto]
+RAW: <!DOCTYPE html><html lang="en-US"><head><title>Just a moment...</title><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=Edge"><meta name="robots" content="noindex,nofollow"><meta name="viewport" content="width=device-width,initial-scal
+---
+### title=naruto  [https://mangaball.com/api/v1/title/search-advanced?page=1&limit=5&title=naruto]
+RAW: <!DOCTYPE html><html lang="en-US"><head><title>Just a moment...</title><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=Edge"><meta name="robots" content="noindex,nofollow"><meta name="viewport" content="width=device-width,initial-scal
+---
+### genres=romance  [https://mangaball.com/api/v1/title/search-advanced?page=1&limit=5&genres=romance]
+RAW: <!DOCTYPE html><html lang="en-US"><head><title>Just a moment...</title><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=Edge"><meta name="robots" content="noindex,nofollow"><meta name="viewport" content="width=device-width,initial-scal
+---
+### genre=romance  [https://mangaball.com/api/v1/title/search-advanced?page=1&limit=5&genre=romance]
+RAW: <!DOCTYPE html><html lang="en-US"><head><title>Just a moment...</title><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=Edge"><meta name="robots" content="noindex,nofollow"><meta name="viewport" content="width=device-width,initial-scal
+---
+### tags=romance  [https://mangaball.com/api/v1/title/search-advanced?page=1&limit=5&tags=romance]
+RAW: <!DOCTYPE html><html lang="en-US"><head><title>Just a moment...</title><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=Edge"><meta name="robots" content="noindex,nofollow"><meta name="viewport" content="width=device-width,initial-scal
+---
+### tag=romance  [https://mangaball.com/api/v1/title/search-advanced?page=1&limit=5&tag=romance]
+RAW: <!DOCTYPE html><html lang="en-US"><head><title>Just a moment...</title><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=Edge"><meta name="robots" content="noindex,nofollow"><meta name="viewport" content="width=device-width,initial-scal
+---
+### tag_ids=685148cf15e8b86aae68e4db  [https://mangaball.com/api/v1/title/search-advanced?page=1&limit=5&tag_ids=685148cf15e8b86aae68e4db]
+RAW: <!DOCTYPE html><html lang="en-US"><head><title>Just a moment...</title><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=Edge"><meta name="robots" content="noindex,nofollow"><meta name="viewport" content="width=device-width,initial-scal
+---
+### status=completed  [https://mangaball.com/api/v1/title/search-advanced?page=1&limit=5&status=completed]
+RAW: <!DOCTYPE html><html lang="en-US"><head><title>Just a moment...</title><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=Edge"><meta name="robots" content="noindex,nofollow"><meta name="viewport" content="width=device-width,initial-scal
+---
+### adult_mode=all  [https://mangaball.com/api/v1/title/search-advanced?page=1&limit=5&adult_mode=all]
+RAW: <!DOCTYPE html><html lang="en-US"><head><title>Just a moment...</title><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=Edge"><meta name="robots" content="noindex,nofollow"><meta name="viewport" content="width=device-width,initial-scal
+---
+### sort_by=views  [https://mangaball.com/api/v1/title/search-advanced?page=1&limit=5&sort_by=views]
+RAW: <!DOCTYPE html><html lang="en-US"><head><title>Just a moment...</title><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=Edge"><meta name="robots" content="noindex,nofollow"><meta name="viewport" content="width=device-width,initial-scal
+---
+### sort=views  [https://mangaball.com/api/v1/title/search-advanced?page=1&limit=5&sort=views]
+RAW: <!DOCTYPE html><html lang="en-US"><head><title>Just a moment...</title><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=Edge"><meta name="robots" content="noindex,nofollow"><meta name="viewport" content="width=device-width,initial-scal
+---
+### sort_order=asc  [https://mangaball.com/api/v1/title/search-advanced?page=1&limit=5&sort_order=asc]
+RAW: <!DOCTYPE html><html lang="en-US"><head><title>Just a moment...</title><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=Edge"><meta name="robots" content="noindex,nofollow"><meta name="viewport" content="width=device-width,initial-scal
+---
+### page=2  [https://mangaball.com/api/v1/title/search-advanced?page=1&limit=5&page=2&limit=5]
+RAW: <!DOCTYPE html><html lang="en-US"><head><title>Just a moment...</title><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=Edge"><meta name="robots" content="noindex,nofollow"><meta name="viewport" content="width=device-width,initial-scal
+---
