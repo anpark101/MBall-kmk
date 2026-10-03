@@ -13,8 +13,20 @@ val extClass = ".MangaBallFactory"
 // CI passes an increasing build number so each release can update the previous one.
 val extVersionCode = (System.getenv("EXT_VERSION_CODE") ?: "1").toInt()
 val libVersion = "1.6" // API level of the extension library this APK is built against
-// The site carries adult titles, so the extension is flagged as mixed content.
-val contentWarning = 1
+
+/*
+ * 0 = safe, 1 = mixed, 2 = explicit.
+ *
+ * This must stay 0. Both Komikku and Mihon refuse to load an extension whose content warning
+ * is not 0 unless the user has enabled "Show NSFW sources" in Settings -> Browse, and the
+ * extension then silently disappears from the list right after it is trusted:
+ *
+ *     if (!loadNsfwSource && isNsfw) return LoadResult.Error
+ *
+ * 18+ results are instead controlled inside the source itself ("Hide 18+ titles", which is
+ * enabled by default and defaults the API to adult_mode=no_18).
+ */
+val contentWarning = 0
 // ---------------------------------------------------------------------------
 
 android {

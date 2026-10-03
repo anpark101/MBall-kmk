@@ -117,7 +117,7 @@ internal class MangaBallSource(
         val demographic = syntax.demographic ?: filters.ofType<DemographicFilter>()?.selected.orEmpty()
         val adultMode = syntax.adultMode
             ?: filters.ofType<AdultFilter>()?.selected
-            ?: if (preferences.getBoolean(PREF_HIDE_NSFW, false)) "no_18" else "all"
+            ?: if (preferences.getBoolean(PREF_HIDE_NSFW, true)) "no_18" else "all"
 
         // Languages are matched against each result locally: the API parameter for this is
         // not documented and a wrong value would silently return nothing.
@@ -357,8 +357,8 @@ internal class MangaBallSource(
         SwitchPreferenceCompat(screen.context).apply {
             key = PREF_HIDE_NSFW
             title = "Hide 18+ titles"
-            summary = "Ask the server to leave out titles marked as 18+."
-            setDefaultValue(false)
+            summary = "Ask the server to leave out titles marked as 18+. Recommended."
+            setDefaultValue(true)
         }.also(screen::addPreference)
 
         SwitchPreferenceCompat(screen.context).apply {

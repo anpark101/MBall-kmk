@@ -148,7 +148,8 @@ in about three minutes.
 | Symptom | Fix |
 | --- | --- |
 | Source shows a red *untrusted* marker | Extensions → Untrusted → tap the shield next to *MangaBall Enhanced*. |
-| Source is not listed in Browse at all | The site carries adult titles, so the extension is flagged as mixed content. Enable the NSFW/adult-sources toggle in Komikku's settings (Settings → Browse) and reopen Komikku. |
+| The extension vanishes right after you trust it | Fixed since v1.6.9. Earlier builds were flagged as NSFW, and both Komikku and Mihon silently drop NSFW-flagged extensions while *Settings → Browse → Show NSFW sources* is off. Either update to v1.6.9+, or enable that toggle (Komikku: Settings → Browse → **NSFW content → Show NSFW sources**, then restart the app) and trust the extension again. |
+| Extension loaded, but no source in Browse | The app hides sources whose language is not enabled. Komikku: Settings → Browse → **Languages** → enable the languages you want; then restart. |
 | Search returns nothing | Clear the included tags / switch Tag mode from AND to OR — very specific combinations genuinely have no results. |
 | "HTTP 403" or a Cloudflare page | Enable **Use Cloudflare bypass client** in the source settings. |
 | "App not installed" when updating | You are installing an APK with a different signature — uninstall the old extension first (the library entries can be re-added afterwards). |
@@ -157,7 +158,36 @@ in about three minutes.
 
 ---
 
-## 8. Notes
+## 8. Why the extension disappeared after trusting (v1.6.8 and older)
+
+Both Komikku and Mihon check an extension's *content warning* flag before loading it:
+
+```kotlin
+val isNsfw = metaData("tachiyomix.contentWarning") > 0 || metaData("tachiyomi.extension.nsfw") == 1
+if (!loadNsfwSource && isNsfw) return LoadResult.Error   // the extension is dropped silently
+...
+installed.filter { showNsfwSources || !it.isNsfw }        // and hidden from the Installed list
+```
+
+Earlier builds of this extension were flagged as mixed content (because the site hosts 18+
+titles), so with *Show NSFW sources* turned off they appeared under **Untrusted**, and the
+moment they were trusted they were rejected and removed from the list — the exact behaviour
+you would see if the extension "disappears after trusting".
+
+**Fixed in v1.6.9:** the APK is no longer flagged as NSFW, so it always loads. Adult content is
+kept out of results by the source's own **Hide 18+ titles** setting, which is now enabled by
+default (`adult_mode=no_18` on every request).
+
+If you prefer the extension to be registered as mixed content again, set
+`val contentWarning = 1` in `extension/build.gradle.kts` and enable *Show NSFW sources* in the
+app first.
+
+> **Heads up when updating:** install the new APK over the old one — the package name and
+> signing key are unchanged, so it updates in place.
+
+---
+
+## 9. Notes
 
 - Tags are sent to the API by **id**, which is why the filter lists are bundled with the
   extension and refreshed automatically when the site adds new tags.
@@ -166,3 +196,6 @@ in about three minutes.
   results.
 - The extension is deliberately compact: everything it needs is provided by the reader app,
   so the APK is under 1 MB.
+- The package name is `eu.kanade.tachiyomi.extension.all.mangaball`. If you also install the
+  official Keiyoushi *Manga Ball* extension (same package name, different key), Android will
+  refuse the second one — uninstall one before installing the other.
