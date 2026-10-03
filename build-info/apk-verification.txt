@@ -1,6 +1,6 @@
 # APK verification
 
-File: tachiyomi-all.mangaball-enhanced-v1.6.8.apk  (738357 bytes)
+File: tachiyomi-all.mangaball-enhanced-v1.6.9.apk  (741933 bytes)
 
 ## Signing certificate
 V2 Signer: certificate DN: CN=MangaBall Enhanced, OU=Extensions, O=GitHub, C=US
@@ -11,7 +11,7 @@ WARNING: META-INF/com/android/build/gradle/app-metadata.properties not protected
 WARNING: META-INF/version-control-info.textproto not protected by signature. Unauthorized modifications to this JAR entry will not be detected. Delete or move the entry outside of META-INF/.
 
 ## Application info
-package: name='eu.kanade.tachiyomi.extension.all.mangaball' versionCode='8' versionName='1.6.8' platformBuildVersionName='15' platformBuildVersionCode='35' compileSdkVersion='35' compileSdkVersionCodename='15'
+package: name='eu.kanade.tachiyomi.extension.all.mangaball' versionCode='9' versionName='1.6.9' platformBuildVersionName='15' platformBuildVersionCode='35' compileSdkVersion='35' compileSdkVersionCodename='15'
 targetSdkVersion:'35'
 application-label:'Tachiyomi: MangaBall Enhanced'
 application-icon-640:'res/o-.png'
@@ -51,15 +51,15 @@ eu/kanade/tachiyomi/extension/all/mangaball/MangaBallFilters
 eu/kanade/tachiyomi/extension/all/mangaball/MangaBallSource
 
 ## Source factory entry point
-108
+122
 
 ## Archive contents
-Archive:  extension/build/outputs/apk/release/tachiyomi-all.mangaball-enhanced-v1.6.8.apk
+Archive:  extension/build/outputs/apk/release/tachiyomi-all.mangaball-enhanced-v1.6.9.apk
   Length      Date    Time    Name
 ---------  ---------- -----   ----
        56  1981-01-01 01:01   META-INF/com/android/build/gradle/app-metadata.properties
       120  1981-01-01 01:01   META-INF/version-control-info.textproto
-  2387672  1981-01-01 01:01   classes.dex
+  2398148  1981-01-01 01:01   classes.dex
       626  1981-01-01 01:01   kotlin-tooling-metadata.json
      1022  1981-01-01 01:01   kotlin/annotation/annotation.kotlin_builtins
      8625  1981-01-01 01:01   kotlin/collections/collections.kotlin_builtins
@@ -76,4 +76,4 @@ Archive:  extension/build/outputs/apk/release/tachiyomi-all.mangaball-enhanced-v
      1298  1981-01-01 01:01   META-INF/CERT.RSA
      1666  1981-01-01 01:01   META-INF/MANIFEST.MF
 ---------                     -------
-  2458571                     18 files
+  2469047                     18 files
