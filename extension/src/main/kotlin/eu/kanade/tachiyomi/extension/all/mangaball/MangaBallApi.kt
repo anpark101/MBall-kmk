@@ -115,9 +115,9 @@ internal fun JsonObject.toSManga(): SManga {
             put("id", titleId)
             put("views", int("views") ?: int("views_count") ?: 0L)
             put("chapters", obj("stats")?.int("chapters") ?: 0L)
-            put("langs", buildJsonArray { availableLanguages().forEach { add(it) } })
-            put("tags", buildJsonArray { titleTags.forEach { add(it.id) } })
-            put("tagNames", buildJsonArray { titleTags.forEach { add(it.name) } })
+            put("langs", buildJsonArray { availableLanguages().forEach { add(JsonPrimitive(it)) } })
+            put("tags", buildJsonArray { titleTags.forEach { add(JsonPrimitive(it.id)) } })
+            put("tagNames", buildJsonArray { titleTags.forEach { add(JsonPrimitive(it.name)) } })
             put("adult", bool("is18plus") ?: false)
         }
     }
@@ -156,9 +156,9 @@ internal fun JsonObject.toMangaDetails(): SManga {
             put("id", string("id") ?: string("_id").orEmpty())
             put("views", int("views") ?: int("views_count") ?: 0L)
             put("chapters", obj("stats")?.int("chapters") ?: 0L)
-            put("langs", buildJsonArray { availableLanguages().forEach { add(it) } })
-            put("tags", buildJsonArray { titleTags.forEach { add(it.id) } })
-            put("tagNames", buildJsonArray { titleTags.forEach { add(it.name) } })
+            put("langs", buildJsonArray { availableLanguages().forEach { add(JsonPrimitive(it)) } })
+            put("tags", buildJsonArray { titleTags.forEach { add(JsonPrimitive(it.id)) } })
+            put("tagNames", buildJsonArray { titleTags.forEach { add(JsonPrimitive(it.name)) } })
             put("adult", bool("is18plus") ?: false)
         }
     }
