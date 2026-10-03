@@ -1,0 +1,93 @@
+name: Probe MangaBall API
+
+on:
+  push:
+    paths:
+      - '.github/workflows/probe.yml'
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Endpoint discovery
+        run: |
+          UA='Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Mobile Safari/537.36'
+          BASE=https://mangaball.com/api/v1
+          for ep in "title/search-advanced?page=1&limit=1" "tag" "tags" "genre" "genres" "tag/all" "tags/all" "genre/all" "genre-listing" "tag-listing" "title/tag-listing" \
+                    "title/search?keyword=naruto&page=1&limit=2" "title/search-advanced?keyword=naruto&page=1&limit=2" "title/search-advanced?search=naruto&page=1&limit=2" \
+                    "title/search-advanced?q=naruto&page=1&limit=2" "title/search-advanced?name=naruto&page=1&limit=2"; do
+            code=$(curl -s -o /tmp/o.json -w '%{http_code}' -A "$UA" --max-time 30 "$BASE/$ep")
+            echo "### $ep -> HTTP $code"
+            head -c 300 /tmp/o.json; echo; echo "---"
+          done
+
+      - name: Search params behaviour
+        run: |
+          UA='Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Mobile Safari/537.36'
+          BASE=https://mangaball.com/api/v1/title/search-advanced
+          probe() {
+            local label="$1"; shift
+            local url="$BASE?page=1&limit=5&$1"
+            out=$(curl -s -A "$UA" --max-time 30 "$url")
+            echo "### $label"
+            echo "$out" | jq -c 'if .data then {n: (.data|length), names: [.data[].name], meta: (.meta // .pagination // .meta_data // null)} else . end' 2>/dev/null || echo "RAW: $(echo "$out" | head -c 200)"
+            echo "---"
+          }
+          probe "baseline" ""
+          probe "keyword=naruto" "keyword=naruto"
+          probe "search=naruto" "search=naruto"
+          probe "q=naruto" "q=naruto"
+          probe "name=naruto" "name=naruto"
+          probe "title=naruto" "title=naruto"
+          probe "genres slug" "genres=romance"
+          probe "genre slug" "genre=romance"
+          probe "tags=romance" "tags=romance"
+          probe "tag=romance" "tag=romance"
+          probe "status" "status=completed"
+          probe "adult_mode=all" "adult_mode=all"
+          probe "sort_by=views" "sort_by=views"
+          probe "sort=views" "sort=views"
+          probe "order_by=views&sort_order=desc" "order_by=views&sort_order=desc"
+
+      - name: Frontend JS analysis
+        run: |
+          UA='Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Mobile Safari/537.36'
+          mkdir -p /tmp/fe && cd /tmp/fe
+          curl -s -A "$UA" --max-time 60 https://mangaball.com/search-advanced -o page.html
+          echo "HTML size: $(wc -c < page.html)"
+          grep -o -E '/_next/static/[^"]+\.js' page.html | sort -u > chunks.txt
+          echo "chunks found: $(wc -l < chunks.txt)"
+          i=0
+          while read -r c; do
+            i=$((i+1))
+            curl -s -A "$UA" --max-time 60 "https://mangaball.com$c" -o "chunk_$i.js"
+          done < chunks.txt
+          echo "downloaded: $(ls chunk_*.js | wc -l) files, total $(du -sh . | cut -f1)"
+          echo "=== files containing 'search-advanced' ==="
+          grep -l "search-advanced" chunk_*.js || echo none
+          echo "=== context around search-advanced api calls ==="
+          grep -o -h -E '.{300}search-advanced.{300}' chunk_*.js | head -40
+          echo "=== candidate query param names ==="
+          grep -o -h -E '\b(genres?|tags?|keyword|search|query|q|excluded?[A-Za-z_]*|include[A-Za-z_]*|sort[A-Za-z_]*|order[A-Za-z_]*|status|demographic|type|origin[a-zA-Z_]*|adult[A-Za-z_]*|lang[uages]*)\b(?=\s*[:=])' chunk_*.js | sort | uniq -c | sort -rn | head -60
+          echo "=== TAGS/GENRE endpoint strings ==="
+          grep -o -h -E '"[a-z0-9/_-]*(tag|genre)[a-z0-9/_-]*"' chunk_*.js | sort -u | head -60
+
+      - name: Detail + chapter + pages sample
+        run: |
+          UA='Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Mobile Safari/537.36'
+          BASE=https://mangaball.com/api/v1
+          echo "=== title detail endpoints ==="
+          TID=6851549a702284f834178389
+          for ep in "title/detail?id=$TID" "title/$TID" "title/detail/$TID" "title-detail/$TID"; do
+            code=$(curl -s -o /tmp/d.json -w '%{http_code}' -A "$UA" --max-time 30 "$BASE/$ep")
+            echo "### $ep -> $code : $(head -c 200 /tmp/d.json)"
+          done
+          echo "=== chapter listing ==="
+          curl -s -A "$UA" --max-time 30 "$BASE/title/chapter-listing?title_id=$TID&page=1&sort_order=desc&group_by=chapter_number&limit=3" | jq -c '{keys: keys, first: (.grouped_data[0] | {chapter_number, release_count: (.releases|length), release0: .releases[0], keys: keys})}' 2>/dev/null | head -c 1500
+          echo
+          echo "=== chapter detail (pages) ==="
+          CID=$(curl -s -A "$UA" --max-time 30 "$BASE/title/chapter-listing?title_id=$TID&page=1&limit=1" | jq -r '.grouped_data[0].releases[0].id')
+          echo "chapter id: $CID"
+          curl -s -A "$UA" --max-time 30 "$BASE/chapter-detail?chapter_id=$CID" | head -c 1200
+          echo
