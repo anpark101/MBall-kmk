@@ -1,0 +1,93 @@
+import java.io.File
+
+plugins {
+    id("com.android.application")
+    id("kotlin-android")
+}
+
+// ---------------------------------------------------------------------------
+// Extension metadata (read by Komikku / Mihon when the APK is loaded)
+// ---------------------------------------------------------------------------
+val extName = "MangaBall Enhanced"
+val extClass = ".MangaBallFactory"
+val extVersionCode = 1
+val libVersion = "1.6" // API level of the extension library this APK is built against
+// The site carries adult titles, so the extension is flagged as mixed content.
+val contentWarning = 1
+// ---------------------------------------------------------------------------
+
+android {
+    namespace = "eu.kanade.tachiyomi.extension.all.mangaball"
+    compileSdk = 35
+
+    defaultConfig {
+        applicationId = "eu.kanade.tachiyomi.extension.all.mangaball"
+        minSdk = 23
+        targetSdk = 35
+        versionCode = extVersionCode
+        versionName = "$libVersion.$extVersionCode"
+
+        manifestPlaceholders["appName"] = "Tachiyomi: $extName"
+        manifestPlaceholders["extClass"] = extClass
+        manifestPlaceholders["nsfw"] = contentWarning.toString()
+        manifestPlaceholders["libVersion"] = libVersion
+    }
+
+    // The signing key lives in the repository (ci/mangaball.jks) so that every build is signed
+    // with the same certificate. Without it the release APK would be unsigned and uninstallable.
+    val signingKeyPath: String? = System.getenv("KEYSTORE_FILE")
+    if (!signingKeyPath.isNullOrBlank() && File(signingKeyPath).exists()) {
+        signingConfigs {
+            create("release") {
+                storeFile = File(signingKeyPath)
+                storePassword = System.getenv("KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("KEY_ALIAS")
+                keyPassword = System.getenv("KEY_PASSWORD")
+            }
+        }
+    }
+
+    buildTypes {
+        getByName("release") {
+            isMinifyEnabled = false
+            if (signingConfigs.findByName("release") != null) {
+                signingConfig = signingConfigs.getByName("release")
+            }
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    applicationVariants.all {
+        val variant = this
+        variant.outputs.all {
+            val output = this as com.android.build.gradle.internal.api.BaseVariantOutputImpl
+            output.outputFileName = "tachiyomi-all.mangaball-enhanced-v${variant.versionName}.apk"
+        }
+    }
+
+    lint {
+        abortOnError = false
+    }
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+    }
+}
+
+dependencies {
+    // Everything below is provided by the reader app at runtime. Nothing is bundled
+    // into the APK, which keeps it small and avoids class-loader conflicts.
+    compileOnly("com.github.mihonapp:tachiyomix:1.6.0") // extension API stubs
+    compileOnly("com.squareup.okhttp3:okhttp:5.4.0")
+    compileOnly("com.github.mihonapp:injekt:91edab2317")
+    compileOnly("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+    compileOnly("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
+    compileOnly("io.reactivex:rxjava:1.3.8")
+    compileOnly("org.jsoup:jsoup:1.22.2")
+}

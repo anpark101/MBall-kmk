@@ -1,0 +1,453 @@
+package eu.kanade.tachiyomi.extension.all.mangaball
+
+import android.app.Application
+import android.content.SharedPreferences
+import androidx.preference.EditTextPreference
+import androidx.preference.PreferenceScreen
+import androidx.preference.SwitchPreferenceCompat
+import eu.kanade.tachiyomi.network.GET
+import eu.kanade.tachiyomi.network.POST
+import eu.kanade.tachiyomi.network.await
+import eu.kanade.tachiyomi.source.ConfigurableSource
+import eu.kanade.tachiyomi.source.model.Filter
+import eu.kanade.tachiyomi.source.model.FilterList
+import eu.kanade.tachiyomi.source.model.MangasPage
+import eu.kanade.tachiyomi.source.model.Page
+import eu.kanade.tachiyomi.source.model.SChapter
+import eu.kanade.tachiyomi.source.model.SManga
+import eu.kanade.tachiyomi.source.model.SMangaUpdate
+import eu.kanade.tachiyomi.source.online.HttpSource
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+import okhttp3.HttpUrl
+import okhttp3.HttpUrl.Companion.toHttpUrl
+import okhttp3.MediaType
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.RequestBody.Companion.toRequestBody
+import java.io.IOException
+import uy.kohesive.injekt.Injekt
+import uy.kohesive.injekt.api.get
+
+internal const val BASE_URL = "https://mangaball.com"
+private const val API_URL = "$BASE_URL/api/v1"
+private const val PAGE_SIZE = 40
+private const val USER_AGENT =
+    "Mozilla/5.0 (Linux; Android 15; Pixel 9) AppleWebKit/537.36 (KHTML, like Gecko) " +
+        "Chrome/131.0.0.0 Mobile Safari/537.36"
+
+private val JSON_MEDIA_TYPE: MediaType = "application/json".toMediaType()
+
+// Preferences
+private const val PREF_BYPASS = "pref_cloudflare_client"
+private const val PREF_HIDE_NSFW = "pref_hide_nsfw"
+private const val PREF_ONLY_SOURCE_LANGUAGE = "pref_only_source_language"
+private const val PREF_ALL_CHAPTER_LANGUAGES = "pref_all_chapter_languages"
+private const val PREF_DEPTH = "pref_search_depth"
+private const val PREF_SCANLATOR_BLACKLIST = "pref_scanlator_blacklist"
+
+internal class MangaBallSource(
+    override val lang: String,
+    private val languageLabel: String,
+) : HttpSource(), ConfigurableSource {
+
+    override val name: String = "MangaBall ($languageLabel)"
+    override val baseUrl: String = BASE_URL
+    override val supportsLatest: Boolean = true
+
+    private val preferences: SharedPreferences by lazy {
+        Injekt.get<Application>().getSharedPreferences("source_$id", 0)
+    }
+
+    /**
+     * The site is behind Cloudflare. Normal requests usually go through, but a user can
+     * opt into the reader's challenge-solving client when they hit blocks.
+     */
+    override val client: OkHttpClient
+        get() = if (preferences.getBoolean(PREF_BYPASS, false)) network.cloudflareClient else network.client
+
+    override fun headersBuilder() = super.headersBuilder()
+        .add("User-Agent", USER_AGENT)
+        .add("Accept", "application/json, text/plain, */*")
+        .add("Accept-Language", "en-US,en;q=0.9")
+        .add("Referer", "$baseUrl/")
+
+    // ------------------------------------------------------------------ browse
+
+    override suspend fun getPopularManga(page: Int): MangasPage =
+        search(page, query = "", filters = FilterList(), forcedSort = SearchSyntax.POPULAR_SORT)
+
+    override suspend fun getLatestUpdates(page: Int): MangasPage =
+        search(page, query = "", filters = FilterList(), forcedSort = SearchSyntax.DEFAULT_SORT)
+
+    override suspend fun getSearchManga(page: Int, query: String, filters: FilterList): MangasPage =
+        search(page, query, filters, forcedSort = null)
+
+    private suspend fun search(
+        page: Int,
+        query: String,
+        filters: FilterList,
+        forcedSort: String?,
+    ): MangasPage {
+        val syntax = SearchSyntax.parse(query)
+        val extraKeywords = filters.ofType<ExtraKeywordFilter>()?.state?.trim().orEmpty()
+        val keyword = listOf(syntax.keyword, extraKeywords)
+            .filter { it.isNotBlank() }
+            .joinToString(" ")
+
+        val sortFilter = filters.ofType<SortFilter>()
+        val sortBy = syntax.sortBy ?: sortFilter?.sortBy ?: forcedSort ?: SearchSyntax.DEFAULT_SORT
+        val sortOrder = syntax.sortOrder ?: sortFilter?.sortOrder ?: "desc"
+
+        val tagGroups = filters.filterIsInstance<TagStateGroup>()
+        val includedTags = (tagGroups.flatMap { it.included } + syntax.includedTags).distinct()
+        val excludedTags = (tagGroups.flatMap { it.excluded } + syntax.excludedTags)
+            .filterNot { it in includedTags }
+            .distinct()
+
+        val tagMode = syntax.tagMode ?: filters.ofType<TagModeFilter>()?.selected ?: "AND"
+        val type = syntax.type ?: filters.ofType<TypeFilter>()?.selected.orEmpty()
+        val status = syntax.status ?: filters.ofType<StatusFilter>()?.selected.orEmpty()
+        val demographic = syntax.demographic ?: filters.ofType<DemographicFilter>()?.selected.orEmpty()
+        val adultMode = syntax.adultMode
+            ?: filters.ofType<AdultFilter>()?.selected
+            ?: if (preferences.getBoolean(PREF_HIDE_NSFW, false)) "no_18" else "all"
+
+        // Languages are matched against each result locally: the API parameter for this is
+        // not documented and a wrong value would silently return nothing.
+        val languageFilter = filters.ofType<LanguageFilter>()
+        val includeLanguages = languageFilter?.included.orEmpty().ifEmpty { SearchSyntax.languageTokens(query) }
+        val excludeLanguages = languageFilter?.excluded.orEmpty()
+
+        val resultOrder = filters.ofType<ResultOrderFilter>()?.selected ?: "server"
+        val focusGenre = filters.ofType<FocusGenreFilter>()?.selected.orEmpty()
+        val focusTag = filters.ofType<FocusTagFilter>()?.selected.orEmpty()
+
+        val depth = (syntax.deepPages
+            ?: preferences.getString(PREF_DEPTH, "1")?.toIntOrNull()
+            ?: 1).coerceIn(1, 5)
+
+        val collected = LinkedHashMap<String, SManga>()
+        var hasNextPage = false
+        var currentPage = page
+        var fetched = 0
+        while (fetched < depth) {
+            val url = buildSearchUrl(
+                page = currentPage,
+                keyword = keyword,
+                sortBy = sortBy,
+                sortOrder = sortOrder,
+                tagMode = tagMode,
+                includedTags = includedTags,
+                excludedTags = excludedTags,
+                type = type,
+                status = status,
+                demographic = demographic,
+                adultMode = adultMode,
+            )
+            val (items, more) = fetchSearchPage(url)
+            items.forEach { collected.putIfAbsent(it.url, it) }
+            hasNextPage = more
+            fetched++
+            if (!more) break
+            currentPage++
+        }
+
+        var results: List<SManga> = collected.values.toList()
+        results = filterByLanguages(results, includeLanguages, excludeLanguages)
+        if (preferences.getBoolean(PREF_ONLY_SOURCE_LANGUAGE, false)) {
+            results = filterByLanguages(results, listOf(lang), emptyList())
+        }
+        results = orderResults(results, resultOrder, focusGenre, focusTag, includedTags)
+
+        return MangasPage(results, hasNextPage)
+    }
+
+    private fun buildSearchUrl(
+        page: Int,
+        keyword: String,
+        sortBy: String,
+        sortOrder: String,
+        tagMode: String,
+        includedTags: List<String>,
+        excludedTags: List<String>,
+        type: String,
+        status: String,
+        demographic: String,
+        adultMode: String,
+    ): HttpUrl = "$API_URL/title/search-advanced".toHttpUrl().newBuilder()
+        .addQueryParameter("page", page.toString())
+        .addQueryParameter("limit", PAGE_SIZE.toString())
+        .addQueryParameter("sort_by", sortBy)
+        .addQueryParameter("sort_order", sortOrder)
+        .addQueryParameter("tag_mode", tagMode)
+        .addQueryParameter("adult_mode", adultMode)
+        .apply {
+            if (keyword.isNotBlank()) addQueryParameter("keyword", keyword)
+            if (includedTags.isNotEmpty()) addQueryParameter("included_tags", includedTags.joinToString(","))
+            if (excludedTags.isNotEmpty()) addQueryParameter("excluded_tags", excludedTags.joinToString(","))
+            if (type.isNotBlank()) addQueryParameter("type", type)
+            if (status.isNotBlank()) addQueryParameter("status", status)
+            if (demographic.isNotBlank()) addQueryParameter("publicationDemographic", demographic)
+        }
+        .build()
+
+    private suspend fun fetchSearchPage(url: HttpUrl): Pair<List<SManga>, Boolean> {
+        val response = client.newCall(GET(url, headers)).await()
+        response.use {
+            if (!it.isSuccessful) throw IOException("HTTP ${it.code}")
+            val body = it.body?.string().orEmpty()
+            val root = body.parseJsonObject() ?: return emptyList<SManga>() to false
+            val data = root.arr("data") ?: return emptyList<SManga>() to false
+            val items = data.mapNotNull { element -> element.asObject()?.toSManga() }
+            val currentPage = root.obj("pagination")?.int("page")?.toInt() ?: 1
+            val totalPages = root.obj("pagination")?.int("total_pages")?.toInt() ?: currentPage
+            return items to (currentPage < totalPages)
+        }
+    }
+
+    // ------------------------------------------------------------- local logic
+
+    private fun filterByLanguages(
+        items: List<SManga>,
+        include: List<String>,
+        exclude: List<String>,
+    ): List<SManga> {
+        if (include.isEmpty() && exclude.isEmpty()) return items
+        val includeSet = include.flatMap { languageCandidates(it) }.toSet()
+        val excludeSet = exclude.flatMap { languageCandidates(it) }.toSet()
+        return items.filter { manga ->
+            val reported = manga.memoLanguages()
+            // When the site does not report languages, fall back to this source's language so
+            // the item is not dropped by an empty comparison.
+            val effective = if (reported.isEmpty()) {
+                languageCandidates(lang)
+            } else {
+                reported.flatMap { languageCandidates(it) }.toSet()
+            }
+            val matchesInclude = includeSet.isEmpty() || effective.any { it in includeSet }
+            val matchesExclude = excludeSet.none { it in effective }
+            matchesInclude && matchesExclude
+        }
+    }
+
+    private fun orderResults(
+        items: List<SManga>,
+        order: String,
+        focusGenre: String,
+        focusTag: String,
+        includedTags: List<String>,
+    ): List<SManga> = when (order) {
+        "title" -> items.sortedBy { it.title.lowercase() }
+        "views" -> items.sortedByDescending { it.memoViews() }
+        "chapters" -> items.sortedByDescending { it.memoChapterCount() }
+        "tag_match" -> rankBy(items) { manga -> includedTags.count { it in manga.memoTagIds() } }
+        "focus_genre" -> rankBy(items) { manga ->
+            val focus = if (focusGenre.isNotEmpty() && focusGenre in manga.memoTagIds()) 1_000 else 0
+            focus + includedTags.count { it in manga.memoTagIds() }
+        }
+        "focus_tag" -> rankBy(items) { manga ->
+            val focus = if (focusTag.isNotEmpty() && focusTag in manga.memoTagIds()) 1_000 else 0
+            focus + includedTags.count { it in manga.memoTagIds() }
+        }
+        else -> items
+    }
+
+    private fun rankBy(items: List<SManga>, score: (SManga) -> Int): List<SManga> =
+        items.withIndex()
+            .sortedWith(compareByDescending<IndexedValue<SManga>> { score(it.value) }.thenBy { it.index })
+            .map { it.value }
+
+    // --------------------------------------------------------------- details
+
+    override suspend fun getMangaUpdate(
+        manga: SManga,
+        chapters: List<SChapter>,
+        fetchDetails: Boolean,
+        fetchChapters: Boolean,
+    ): SMangaUpdate = coroutineScope {
+        val details = async { if (fetchDetails) loadDetails(manga) else manga }
+        val chapterList = async { if (fetchChapters) loadChapters(manga) else chapters }
+        SMangaUpdate(details.await(), chapterList.await())
+    }
+
+    private suspend fun loadDetails(manga: SManga): SManga {
+        val identifier = manga.titleId() ?: manga.url
+        val response = client.newCall(GET("$API_URL/title/detail/$identifier", headers)).await()
+        response.use {
+            if (!it.isSuccessful) throw IOException("HTTP ${it.code}")
+            val body = it.body?.string().orEmpty()
+            val root = body.parseJsonObject() ?: throw IOException("Empty response")
+            val data = root.obj("data")
+                ?: root.arr("data")?.firstOrNull()?.asObject()
+                ?: throw IOException("Malformed response")
+            return data.toMangaDetails().apply { url = manga.url }
+        }
+    }
+
+    private suspend fun loadChapters(manga: SManga): List<SChapter> {
+        val titleId = manga.titleId() ?: loadTitleId(manga)
+            ?: throw IOException("Could not resolve the title id")
+
+        val payload = buildJsonObject { put("title_id", titleId) }
+            .toString()
+            .toByteArray()
+            .toRequestBody(JSON_MEDIA_TYPE)
+
+        val response = client.newCall(POST("$API_URL/chapter/chapter-listing-by-title-id", headers, payload)).await()
+        response.use {
+            if (!it.isSuccessful) throw IOException("HTTP ${it.code}")
+            val body = it.body?.string().orEmpty()
+            val root = body.parseJsonObject() ?: return emptyList()
+            val data = root.arr("data") ?: return emptyList()
+            val allowedLanguages =
+                if (preferences.getBoolean(PREF_ALL_CHAPTER_LANGUAGES, false)) emptySet() else siteLanguages(lang)
+            val blacklist = scanlatorBlacklist()
+            return data.mapNotNull { element -> element.asObject()?.toSChapter(allowedLanguages) }
+                .filterNot { chapter ->
+                    blacklist.any { blocked -> chapter.scanlator?.equals(blocked, true) == true }
+                }
+        }
+    }
+
+    private suspend fun loadTitleId(manga: SManga): String? {
+        val response = client.newCall(GET("$API_URL/title/detail/${manga.url}", headers)).await()
+        response.use {
+            val body = it.body?.string().orEmpty()
+            val root = body.parseJsonObject() ?: return null
+            val data = root.obj("data") ?: root.arr("data")?.firstOrNull()?.asObject() ?: return null
+            return data.string("id")
+        }
+    }
+
+    override suspend fun getPageList(chapter: SChapter): List<Page> {
+        val response = client.newCall(GET("$API_URL/chapter-detail?chapter_id=${chapter.url}", headers)).await()
+        response.use {
+            if (!it.isSuccessful) throw IOException("HTTP ${it.code}")
+            val body = it.body?.string().orEmpty()
+            val root = body.parseJsonObject() ?: throw IOException("Empty response")
+            val pages = root.obj("data")?.obj("chapter")?.strings("pages").orEmpty()
+            return pages.mapIndexed { index, url -> Page(index, url, url) }
+        }
+    }
+
+    override fun getMangaUrl(manga: SManga): String =
+        "$baseUrl/title-detail/${manga.titleId() ?: manga.url}"
+
+    override fun getChapterUrl(chapter: SChapter): String = "$baseUrl/chapter-detail/${chapter.url}"
+
+    // --------------------------------------------------------------- filters
+
+    override fun getFilterList(): FilterList = FilterList(
+        SortFilter(),
+        ResultOrderFilter(),
+        FocusGenreFilter(),
+        FocusTagFilter(),
+        Filter.Separator(),
+        Filter.Header(
+            "Search box extras: tag:romance -tag:ecchi sort:views order:asc status:ongoing " +
+                "type:manhwa demo:shounen lang:en,es adult:safe mode:or pages:3",
+        ),
+        Filter.Separator(),
+        TypeFilter(),
+        DemographicFilter(),
+        StatusFilter(),
+        TagModeFilter(),
+        AdultFilter(),
+        ExtraKeywordFilter(),
+        Filter.Separator(),
+        Filter.Header("Languages - tap once to require, tap twice to exclude (matched locally)"),
+        LanguageFilter("Languages", MangaBallFilters.LANGUAGES),
+        Filter.Separator(),
+        Filter.Header("Tags - tap once to include, tap twice to exclude"),
+        GenreFilter(),
+        ThemeFilter(),
+        FormatFilter(),
+        ContentFilter(),
+        Filter.Header("Missing tag? Type tag:its name in the search box."),
+    )
+
+    // ----------------------------------------------------------- preferences
+
+    override fun setupPreferenceScreen(screen: PreferenceScreen) {
+        SwitchPreferenceCompat(screen.context).apply {
+            key = PREF_HIDE_NSFW
+            title = "Hide 18+ titles"
+            summary = "Ask the server to leave out titles marked as 18+."
+            setDefaultValue(false)
+        }.also(screen::addPreference)
+
+        SwitchPreferenceCompat(screen.context).apply {
+            key = PREF_ONLY_SOURCE_LANGUAGE
+            title = "Only titles available in this source's language"
+            summary = "Filters results locally by the languages a title has chapters in."
+            setDefaultValue(false)
+        }.also(screen::addPreference)
+
+        SwitchPreferenceCompat(screen.context).apply {
+            key = PREF_ALL_CHAPTER_LANGUAGES
+            title = "Show chapters in every language"
+            summary = "Off: only chapters matching this source's language are listed."
+            setDefaultValue(false)
+        }.also(screen::addPreference)
+
+        SwitchPreferenceCompat(screen.context).apply {
+            key = PREF_BYPASS
+            title = "Use Cloudflare bypass client"
+            summary = "Turn on when searches fail with HTTP 403 / a Cloudflare challenge."
+            setDefaultValue(false)
+        }.also(screen::addPreference)
+
+        EditTextPreference(screen.context).apply {
+            key = PREF_DEPTH
+            title = "Search depth (1-5 pages)"
+            summary = "How many result pages a single search merges. Higher is slower but finds more."
+            setDefaultValue("1")
+        }.also(screen::addPreference)
+
+        EditTextPreference(screen.context).apply {
+            key = PREF_SCANLATOR_BLACKLIST
+            title = "Scanlator blacklist"
+            summary = "Comma separated group names whose chapters are hidden."
+            setDefaultValue("")
+        }.also(screen::addPreference)
+    }
+
+    private fun scanlatorBlacklist(): List<String> =
+        preferences.getString(PREF_SCANLATOR_BLACKLIST, null).orEmpty()
+            .split(',')
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+}
+
+/**
+ * A language code can be written in several ways by the site (`es`, `es-419`, `es-la`, `jp`).
+ * This returns every spelling that should be treated as the same language.
+ */
+internal fun languageCandidates(code: String): Set<String> {
+    val lower = code.trim().lowercase()
+    if (lower.isEmpty()) return emptySet()
+    val base = lower.substringBefore('-')
+    val alias = when (base) {
+        "jp" -> "ja"
+        "kr" -> "ko"
+        "cn" -> "zh"
+        else -> base
+    }
+    return setOf(lower, base, alias)
+}
+
+/** Chapter languages that belong to a source language. */
+internal fun siteLanguages(code: String): Set<String> = when (code.lowercase()) {
+    "es" -> setOf("es", "es-419", "es-la", "es-es", "es-mx", "es-ar")
+    "pt-br" -> setOf("pt-br", "pt", "pt-pt")
+    "zh" -> setOf("zh", "zh-cn", "zh-hk", "zh-tw", "cn")
+    "ja" -> setOf("ja", "jp")
+    "ko" -> setOf("ko", "kr")
+    else -> setOf(code.lowercase())
+}
+
+private inline fun <reified T : Filter<*>> FilterList.ofType(): T? =
+    firstOrNull { it is T } as? T

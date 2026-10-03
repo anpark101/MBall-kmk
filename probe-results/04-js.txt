@@ -1,8 +1,0 @@
-## JS analysis
-chunks found: 0
-downloaded: 0 files
-=== files containing 'search-advanced' ===
-none
-=== context around search-advanced ===
-=== TAGS/GENRE endpoint strings ===
-=== query param keys used near filters ===
