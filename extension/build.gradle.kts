@@ -119,8 +119,5 @@ dependencies {
     // test-only and are never packaged into the APK.
     testImplementation("junit:junit:4.13.2")
     testImplementation(kotlin("stdlib"))
-    // Needed at *test* runtime only: the sources read SManga.memo with kotlinx-serialization-json,
-    // which is compileOnly for the app. Test-only dependencies never reach the APK (CI proves it).
-    testImplementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
     testImplementation("com.github.mihonapp:tachiyomix:1.6.0")
 }

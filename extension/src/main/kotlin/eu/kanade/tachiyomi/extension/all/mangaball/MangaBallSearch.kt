@@ -99,12 +99,12 @@ internal object SmartSearch {
         }.coerceIn(0.0, 1.0)
     }
 
-    /** The best score over the title and all alternative titles a result carries. */
-    fun score(query: String, title: String, alternativeTitles: List<String>): Double {
-        var best = similarity(query, title)
-        for (alternative in alternativeTitles) {
+    /** The best score over every text a result is known by (title + alternative titles). */
+    fun score(query: String, texts: List<String>): Double {
+        var best = 0.0
+        for (text in texts) {
             if (best >= 1.0) break
-            val candidate = similarity(query, alternative)
+            val candidate = similarity(query, text)
             if (candidate > best) best = candidate
         }
         return best
@@ -187,9 +187,9 @@ internal object SmartSearch {
      *
      * The sort is stable, so results with an equal score keep the server's order.
      */
-    fun rankForQuery(query: String, items: List<SManga>): List<SManga> {
+    fun <T> rank(query: String, items: List<T>, texts: (T) -> List<String>): List<T> {
         if (items.size < 2) return items
-        val scored = items.map { it to scoreManga(query, it) }
+        val scored = items.map { it to score(query, texts(it)) }
         val best = scored.maxOf { it.second }
         if (best < WEAK) return items
 
@@ -250,6 +250,19 @@ internal object SmartSearch {
     }
 }
 
-/** Score of a search result against the query, using the title and its alternative titles. */
+// ---------------------------------------------------------------------------
+// SManga adapters. Kept deliberately thin: everything that matters is scored in [SmartSearch],
+// which takes plain strings so that it is fully covered by the unit tests (the real
+// SManga.create() only exists inside the reader app, not in the test classpath).
+// ---------------------------------------------------------------------------
+
+/** The texts a result is known by: its title plus every alternative title. */
+internal fun SManga.searchTexts(): List<String> = listOf(title) + memoAltTitles()
+
+/** Score of a search result against the query. */
 internal fun scoreManga(query: String, manga: SManga): Double =
-    SmartSearch.score(query, manga.title, manga.memoAltTitles())
+    SmartSearch.score(query, manga.searchTexts())
+
+/** Filter + relevance ordering of a result set. */
+internal fun rankMangas(query: String, items: List<SManga>): List<SManga> =
+    SmartSearch.rank(query, items) { it.searchTexts() }

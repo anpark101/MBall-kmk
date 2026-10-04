@@ -1,10 +1,5 @@
 package eu.kanade.tachiyomi.extension.all.mangaball
 
-import eu.kanade.tachiyomi.source.model.SManga
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonArray
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -17,20 +12,11 @@ import org.junit.Test
  */
 class MangaBallSearchTest {
 
-    private fun manga(title: String, alternativeTitles: List<String> = emptyList()): SManga =
-        SManga.create().apply {
-            url = title.lowercase().replace(Regex("[^a-z0-9]+"), "-").trim('-')
-            this.title = title
-            // SManga.memo is a JsonObject in the extension API - build it directly.
-            memo = buildJsonObject {
-                put(
-                    "altTitles",
-                    buildJsonArray { alternativeTitles.forEach { add(JsonPrimitive(it)) } },
-                )
-            }
-        }
-
     private fun score(query: String, title: String): Double = SmartSearch.similarity(query, title)
+
+    /** Ranking works on plain strings, which is exactly how [SmartSearch] is written. */
+    private fun rank(query: String, titles: List<String>): List<String> =
+        SmartSearch.rank(query, titles) { listOf(it) }
 
     // ------------------------------------------------------------------ normalization
 
@@ -101,10 +87,10 @@ class MangaBallSearchTest {
 
     @Test
     fun `alternative titles are searched too`() {
-        val mieruko = manga("見える子ちゃん", listOf("Mieruko-chan", "The Girl Who Can See Them"))
-        assertTrue(scoreManga("mieruko", mieruko) >= 0.95)
-        assertTrue(scoreManga("the girl who can see them", mieruko) >= 0.95)
-        assertTrue(scoreManga("見える子ちゃん", mieruko) >= 0.99)
+        val mieruko = listOf("見える子ちゃん", "Mieruko-chan", "The Girl Who Can See Them")
+        assertTrue(SmartSearch.score("mieruko", mieruko) >= 0.95)
+        assertTrue(SmartSearch.score("the girl who can see them", mieruko) >= 0.95)
+        assertTrue(SmartSearch.score("見える子ちゃん", mieruko) >= 0.99)
     }
 
     // ------------------------------------------------------------------ variants
@@ -155,37 +141,29 @@ class MangaBallSearchTest {
     @Test
     fun `the reported junk list keeps only the searched title`() {
         val pool = listOf(
-            manga("Super! Makoto-Chan"),
-            manga("You are Bun-chan's Love"),
-            manga("Onii-chan Is Done For!"),
-            manga("Ri-chan"),
-            manga("Mieruko-chan", listOf("見える子ちゃん", "Mieruko-Chan")),
-            manga("Toudou-san to Nia-chan"),
+            "Super! Makoto-Chan",
+            "You are Bun-chan's Love",
+            "Onii-chan Is Done For!",
+            "Ri-chan",
+            "Mieruko-chan",
+            "Toudou-san to Nia-chan",
         )
-        val ranked = SmartSearch.rankForQuery("mieruko-ct", pool)
-        assertEquals(1, ranked.size)
-        assertEquals("Mieruko-chan", ranked.first().title)
+        assertEquals(listOf("Mieruko-chan"), rank("mieruko-ct", pool))
     }
 
     @Test
     fun `relevant results come first and junk is dropped`() {
-        val pool = listOf(
-            manga("Boruto"),
-            manga("One Piece"),
-            manga("Naruto"),
-            manga("Naruto Gaiden"),
-        )
-        val ranked = SmartSearch.rankForQuery("naruto", pool)
-        assertEquals("Naruto", ranked.first().title)
-        assertTrue(ranked.none { it.title == "One Piece" })
+        val pool = listOf("Boruto", "One Piece", "Naruto", "Naruto Gaiden")
+        val ranked = rank("naruto", pool)
+        assertEquals("Naruto", ranked.first())
+        assertTrue(ranked.none { it == "One Piece" })
         assertTrue(ranked.size >= 2)
     }
 
     @Test
     fun `equal scores keep the order the server returned`() {
-        val pool = listOf(manga("Naruto"), manga("Naruto Gaiden"), manga("Naruto Shippuden"))
-        val ranked = SmartSearch.rankForQuery("naruto", pool)
-        assertEquals(listOf("Naruto", "Naruto Gaiden", "Naruto Shippuden"), ranked.map { it.title })
+        val pool = listOf("Naruto", "Naruto Gaiden", "Naruto Shippuden")
+        assertEquals(pool, rank("naruto", pool))
     }
 
     @Test
@@ -193,15 +171,15 @@ class MangaBallSearchTest {
         // A search for an author, a description word or a scanlation group can legitimately
         // return titles whose *names* have nothing to do with the query - dropping those would
         // break the search, so the server's answer must survive untouched.
-        val pool = listOf(manga("Naruto"), manga("One Piece"), manga("Bleach"))
-        assertEquals(pool, SmartSearch.rankForQuery("izumi tomoki", pool))
+        val pool = listOf("Naruto", "One Piece", "Bleach")
+        assertEquals(pool, rank("izumi tomoki", pool))
     }
 
     @Test
     fun `empty result sets are returned as is`() {
-        assertEquals(emptyList<SManga>(), SmartSearch.rankForQuery("naruto", emptyList()))
-        val single = listOf(manga("Naruto"))
-        assertEquals(single, SmartSearch.rankForQuery("naruto", single))
+        assertEquals(emptyList<String>(), rank("naruto", emptyList()))
+        val single = listOf("Naruto")
+        assertEquals(single, rank("naruto", single))
     }
 
     // ------------------------------------------------------------------ distance

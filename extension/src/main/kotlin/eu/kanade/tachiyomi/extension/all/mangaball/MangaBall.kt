@@ -256,7 +256,7 @@ internal class MangaBallSource(
         items.forEach { pool[it.url] = it }
 
         var best = pool.values.maxOfOrNull { scoreManga(query, it) } ?: 0.0
-        if (best >= SmartSearch.KEEP) return SmartSearch.rankForQuery(query, pool.values.toList())
+        if (best >= SmartSearch.KEEP) return rankMangas(query, pool.values.toList())
 
         val variants = SmartSearch.candidateQueries(query)
         for (index in 0 until minOf(variants.size, SmartSearch.MAX_PROBES)) {
@@ -273,7 +273,7 @@ internal class MangaBallSource(
             if (best >= SmartSearch.STRONG) break
         }
 
-        return SmartSearch.rankForQuery(query, pool.values.toList())
+        return rankMangas(query, pool.values.toList())
     }
 
     private suspend fun fetchSearchPage(url: HttpUrl): Pair<List<SManga>, Boolean> {
