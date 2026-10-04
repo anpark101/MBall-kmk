@@ -1,10 +1,10 @@
 # APK verification
 
 ## Unit tests
-tests=59 failures=0 errors=0 (from 2 report file(s))
-tests="34" skipped="0" failures="0" errors="0"
-tests="25" skipped="0" failures="0" errors="0"
-File: tachiyomi-all.mangaball-enhanced-v1.6.24.apk  (81842 bytes)
+tests=65 failures=0 errors=0 (from 2 report file(s))
+tests="36" skipped="0" failures="0" errors="0"
+tests="29" skipped="0" failures="0" errors="0"
+File: tachiyomi-all.mangaball-enhanced-v1.6.25.apk  (83081 bytes)
 
 ## Signing certificate
 V2 Signer: certificate DN: CN=MangaBall Enhanced, OU=Extensions, O=GitHub, C=US
@@ -15,7 +15,7 @@ WARNING: META-INF/com/android/build/gradle/app-metadata.properties not protected
 WARNING: META-INF/version-control-info.textproto not protected by signature. Unauthorized modifications to this JAR entry will not be detected. Delete or move the entry outside of META-INF/.
 
 ## Application info
-package: name='eu.kanade.tachiyomi.extension.all.mangaball' versionCode='24' versionName='1.6.24' platformBuildVersionName='15' platformBuildVersionCode='35' compileSdkVersion='35' compileSdkVersionCodename='15'
+package: name='eu.kanade.tachiyomi.extension.all.mangaball' versionCode='25' versionName='1.6.25' platformBuildVersionName='15' platformBuildVersionCode='35' compileSdkVersion='35' compileSdkVersionCodename='15'
 targetSdkVersion:'35'
 application-label:'Tachiyomi: MangaBall Enhanced'
 application-icon-640:'res/o-.png'
@@ -24,8 +24,8 @@ application: label='Tachiyomi: MangaBall Enhanced' icon='res/o-.png'
 ## Full manifest (a merged <uses-feature tachiyomi.extension /> is REQUIRED for the app to list the extension)
 N: android=http://schemas.android.com/apk/res/android (line=2)
   E: manifest (line=2)
-    A: http://schemas.android.com/apk/res/android:versionCode(0x0101021b)=24
-    A: http://schemas.android.com/apk/res/android:versionName(0x0101021c)="1.6.24" (Raw: "1.6.24")
+    A: http://schemas.android.com/apk/res/android:versionCode(0x0101021b)=25
+    A: http://schemas.android.com/apk/res/android:versionName(0x0101021c)="1.6.25" (Raw: "1.6.25")
     A: http://schemas.android.com/apk/res/android:compileSdkVersion(0x01010572)=35
     A: http://schemas.android.com/apk/res/android:compileSdkVersionCodename(0x01010573)="15" (Raw: "15")
     A: package="eu.kanade.tachiyomi.extension.all.mangaball" (Raw: "eu.kanade.tachiyomi.extension.all.mangaball")
@@ -190,12 +190,12 @@ classes under eu/kanade/tachiyomi/extension/all/mangaball (87):
 OK: 87 classes, none of them from kotlin/, kotlinx/, okhttp3/, okio/, uy/, org/jsoup/, rx/, androidx/, org/jetbrains/
 
 ## Archive contents
-Archive:  extension/build/outputs/apk/release/tachiyomi-all.mangaball-enhanced-v1.6.24.apk
+Archive:  extension/build/outputs/apk/release/tachiyomi-all.mangaball-enhanced-v1.6.25.apk
   Length      Date    Time    Name
 ---------  ---------- -----   ----
        56  1981-01-01 01:01   META-INF/com/android/build/gradle/app-metadata.properties
       120  1981-01-01 01:01   META-INF/version-control-info.textproto
-   155712  1981-01-01 01:01   classes.dex
+   158336  1981-01-01 01:01   classes.dex
       626  1981-01-01 01:01   kotlin-tooling-metadata.json
      3212  1981-01-01 01:01   AndroidManifest.xml
      8221  1981-01-01 01:01   res/o-.png
@@ -204,4 +204,4 @@ Archive:  extension/build/outputs/apk/release/tachiyomi-all.mangaball-enhanced-v
      1298  1981-01-01 01:01   META-INF/CERT.RSA
       764  1981-01-01 01:01   META-INF/MANIFEST.MF
 ---------                     -------
-   171415                     10 files
+   174039                     10 files
