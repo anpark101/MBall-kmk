@@ -1,8 +1,7 @@
 # APK verification
 
 ## Unit tests
-tests="29" skipped="0" failures="0" errors="0"
-File: tachiyomi-all.mangaball-enhanced-v1.6.17.apk  (72966 bytes)
+File: tachiyomi-all.mangaball-enhanced-v1.6.19.apk  (79505 bytes)
 
 ## Signing certificate
 V2 Signer: certificate DN: CN=MangaBall Enhanced, OU=Extensions, O=GitHub, C=US
@@ -13,7 +12,7 @@ WARNING: META-INF/com/android/build/gradle/app-metadata.properties not protected
 WARNING: META-INF/version-control-info.textproto not protected by signature. Unauthorized modifications to this JAR entry will not be detected. Delete or move the entry outside of META-INF/.
 
 ## Application info
-package: name='eu.kanade.tachiyomi.extension.all.mangaball' versionCode='17' versionName='1.6.17' platformBuildVersionName='15' platformBuildVersionCode='35' compileSdkVersion='35' compileSdkVersionCodename='15'
+package: name='eu.kanade.tachiyomi.extension.all.mangaball' versionCode='19' versionName='1.6.19' platformBuildVersionName='15' platformBuildVersionCode='35' compileSdkVersion='35' compileSdkVersionCodename='15'
 targetSdkVersion:'35'
 application-label:'Tachiyomi: MangaBall Enhanced'
 application-icon-640:'res/o-.png'
@@ -22,8 +21,8 @@ application: label='Tachiyomi: MangaBall Enhanced' icon='res/o-.png'
 ## Full manifest (a merged <uses-feature tachiyomi.extension /> is REQUIRED for the app to list the extension)
 N: android=http://schemas.android.com/apk/res/android (line=2)
   E: manifest (line=2)
-    A: http://schemas.android.com/apk/res/android:versionCode(0x0101021b)=17
-    A: http://schemas.android.com/apk/res/android:versionName(0x0101021c)="1.6.17" (Raw: "1.6.17")
+    A: http://schemas.android.com/apk/res/android:versionCode(0x0101021b)=19
+    A: http://schemas.android.com/apk/res/android:versionName(0x0101021c)="1.6.19" (Raw: "1.6.19")
     A: http://schemas.android.com/apk/res/android:compileSdkVersion(0x01010572)=35
     A: http://schemas.android.com/apk/res/android:compileSdkVersionCodename(0x01010573)="15" (Raw: "15")
     A: package="eu.kanade.tachiyomi.extension.all.mangaball" (Raw: "eu.kanade.tachiyomi.extension.all.mangaball")
@@ -94,9 +93,9 @@ feature-group: label=''
             A: http://schemas.android.com/apk/res/android:value(0x01010024)=1.6
 
 ## Classes DEFINED in the APK (dex class_defs - the classes actually shipped)
-classes.dex: 77 classes defined
+classes.dex: 83 classes defined
 
-classes under eu/kanade/tachiyomi/extension/all/mangaball (77):
+classes under eu/kanade/tachiyomi/extension/all/mangaball (83):
   eu/kanade/tachiyomi/extension/all/mangaball/AdultFilter
   eu/kanade/tachiyomi/extension/all/mangaball/ContentFilter
   eu/kanade/tachiyomi/extension/all/mangaball/DemographicFilter
@@ -138,9 +137,11 @@ classes under eu/kanade/tachiyomi/extension/all/mangaball (77):
   eu/kanade/tachiyomi/extension/all/mangaball/MangaBallRankingKt$rankingPermutation$$inlined$thenBy$3
   eu/kanade/tachiyomi/extension/all/mangaball/MangaBallRankingKt$rankingPermutation$$inlined$thenBy$4
   eu/kanade/tachiyomi/extension/all/mangaball/MangaBallRankingKt$rankingPermutation$$inlined$thenBy$5
+  eu/kanade/tachiyomi/extension/all/mangaball/MangaBallSearchKt
   eu/kanade/tachiyomi/extension/all/mangaball/MangaBallSource
   eu/kanade/tachiyomi/extension/all/mangaball/MangaBallSource$$ExternalSyntheticApiModelOutline0
   eu/kanade/tachiyomi/extension/all/mangaball/MangaBallSource$$ExternalSyntheticLambda1
+  eu/kanade/tachiyomi/extension/all/mangaball/MangaBallSource$$ExternalSyntheticLambda2
   eu/kanade/tachiyomi/extension/all/mangaball/MangaBallSource$fetchSearchPage$1
   eu/kanade/tachiyomi/extension/all/mangaball/MangaBallSource$getMangaUpdate$2
   eu/kanade/tachiyomi/extension/all/mangaball/MangaBallSource$getMangaUpdate$2$chapterList$1
@@ -150,6 +151,7 @@ classes under eu/kanade/tachiyomi/extension/all/mangaball (77):
   eu/kanade/tachiyomi/extension/all/mangaball/MangaBallSource$loadDetails$1
   eu/kanade/tachiyomi/extension/all/mangaball/MangaBallSource$loadTitleId$1
   eu/kanade/tachiyomi/extension/all/mangaball/MangaBallSource$preferences_delegate$lambda$0$$inlined$get$1
+  eu/kanade/tachiyomi/extension/all/mangaball/MangaBallSource$refineForQuery$1
   eu/kanade/tachiyomi/extension/all/mangaball/MangaBallSource$search$1
   eu/kanade/tachiyomi/extension/all/mangaball/MangaBallTag
   eu/kanade/tachiyomi/extension/all/mangaball/R
@@ -164,6 +166,9 @@ classes under eu/kanade/tachiyomi/extension/all/mangaball (77):
   eu/kanade/tachiyomi/extension/all/mangaball/SearchSyntax$$ExternalSyntheticLambda2
   eu/kanade/tachiyomi/extension/all/mangaball/SearchSyntax$$ExternalSyntheticLambda3
   eu/kanade/tachiyomi/extension/all/mangaball/SelectFilter
+  eu/kanade/tachiyomi/extension/all/mangaball/SmartSearch
+  eu/kanade/tachiyomi/extension/all/mangaball/SmartSearch$candidateQueries$$inlined$sortedByDescending$1
+  eu/kanade/tachiyomi/extension/all/mangaball/SmartSearch$rankForQuery$$inlined$sortedByDescending$1
   eu/kanade/tachiyomi/extension/all/mangaball/SortFilter
   eu/kanade/tachiyomi/extension/all/mangaball/SortFilter$Companion
   eu/kanade/tachiyomi/extension/all/mangaball/StatusFilter
@@ -175,15 +180,15 @@ classes under eu/kanade/tachiyomi/extension/all/mangaball (77):
   eu/kanade/tachiyomi/extension/all/mangaball/ThemeFilter
   eu/kanade/tachiyomi/extension/all/mangaball/TypeFilter
 
-OK: 77 classes, none of them from kotlin/, kotlinx/, okhttp3/, okio/, uy/, org/jsoup/, rx/, androidx/, org/jetbrains/
+OK: 83 classes, none of them from kotlin/, kotlinx/, okhttp3/, okio/, uy/, org/jsoup/, rx/, androidx/, org/jetbrains/
 
 ## Archive contents
-Archive:  extension/build/outputs/apk/release/tachiyomi-all.mangaball-enhanced-v1.6.17.apk
+Archive:  extension/build/outputs/apk/release/tachiyomi-all.mangaball-enhanced-v1.6.19.apk
   Length      Date    Time    Name
 ---------  ---------- -----   ----
        56  1981-01-01 01:01   META-INF/com/android/build/gradle/app-metadata.properties
       120  1981-01-01 01:01   META-INF/version-control-info.textproto
-   135660  1981-01-01 01:01   classes.dex
+   149928  1981-01-01 01:01   classes.dex
       626  1981-01-01 01:01   kotlin-tooling-metadata.json
      3212  1981-01-01 01:01   AndroidManifest.xml
      8221  1981-01-01 01:01   res/o-.png
@@ -192,4 +197,4 @@ Archive:  extension/build/outputs/apk/release/tachiyomi-all.mangaball-enhanced-v
      1298  1981-01-01 01:01   META-INF/CERT.RSA
       764  1981-01-01 01:01   META-INF/MANIFEST.MF
 ---------                     -------
-   151363                     10 files
+   165631                     10 files
