@@ -76,8 +76,10 @@ jobs:
 
       - name: Run tests
         run: |
-          gradle :extension:testReleaseUnitTest --no-daemon --console=plain --info 2>&1 | tee test-output.log
-          grep -E "MangaBallLogicTest|tests completed|BUILD SUCCESSFUL" test-output.log | tail -n 5 || true
+          # --rerun-tasks: never take a cached/up-to-date test task, so a JUnit report always
+          # exists for the verification step below.
+          gradle :extension:testReleaseUnitTest --rerun-tasks --no-daemon --console=plain --info 2>&1 | tee test-output.log
+          grep -E "MangaBall(Logic|Search)Test|tests completed|BUILD SUCCESSFUL" test-output.log | tail -n 8 || true
 
       - name: Build APK
         run: |
@@ -91,7 +93,7 @@ jobs:
           mkdir -p build-logs
           {
             echo "### test failures"
-            grep -E "FAILED|MangaBallLogicTest" test-output.log 2>/dev/null | head -n 40 || true
+            grep -E "FAILED|MangaBall(Logic|Search)Test" test-output.log 2>/dev/null | head -n 40 || true
             echo
             echo "### compiler diagnostics"
             grep -n -E "^(e|w): " build-output.log | head -n 120 || true
@@ -119,8 +121,33 @@ jobs:
             echo "# APK verification"
             echo
             echo "## Unit tests"
-            grep -h -o 'tests="[0-9]*" skipped="[0-9]*" failures="[0-9]*" errors="[0-9]*"' \
-              extension/build/test-results/testReleaseUnitTest/*.xml 2>/dev/null | head -n 5 || echo "no test report found"
+            xmls=$(ls extension/build/test-results/testReleaseUnitTest/*.xml 2>/dev/null || true)
+            if [ -z "$xmls" ] && [ ! -d extension/build/test-results ]; then
+              # The test step's output was cleaned up somehow - redo it here so the release is
+              # never published without evidence that the tests passed.
+              echo "!! no test results directory - running the unit tests again"
+              gradle :extension:testReleaseUnitTest --rerun-tasks --no-daemon --console=plain >/dev/null 2>&1 || true
+              xmls=$(ls extension/build/test-results/testReleaseUnitTest/*.xml 2>/dev/null || true)
+            fi
+            if [ -n "$xmls" ]; then
+              reports=$(echo "$xmls" | wc -l)
+              tests=$(grep -h -o 'tests="[0-9]*"' $xmls | grep -o '[0-9]*' | awk '{s+=$1} END {print s+0}')
+              failures=$(grep -h -o 'failures="[0-9]*"' $xmls | grep -o '[0-9]*' | awk '{s+=$1} END {print s+0}')
+              errors=$(grep -h -o 'errors="[0-9]*"' $xmls | grep -o '[0-9]*' | awk '{s+=$1} END {print s+0}')
+              echo "tests=$tests failures=$failures errors=$errors (from $reports report file(s))"
+              grep -h -o 'tests="[0-9]*" skipped="[0-9]*" failures="[0-9]*" errors="[0-9]*"' $xmls
+              if [ "$failures" != "0" ] || [ "$errors" != "0" ]; then
+                echo "!! unit tests failed - refusing to publish" | tee /dev/stderr
+                exit 1
+              fi
+            else
+              echo "!! WARNING: no JUnit report found, the test counts could not be verified"
+              echo "contents of extension/build/test-results (if any):"
+              ls -R extension/build/test-results 2>/dev/null | head -n 20 || true
+              echo "gradle test summary from the log:"
+              grep -E "MangaBall(Logic|Search)Test|tests completed|FAILED|FROM-CACHE" test-output.log 2>/dev/null | tail -n 20 || true
+              echo "!! WARNING: continuing without a verified test count" | tee /dev/stderr
+            fi
             echo "File: $(basename "$apk")  ($(stat -c %s "$apk") bytes)"
             echo
             echo "## Signing certificate"

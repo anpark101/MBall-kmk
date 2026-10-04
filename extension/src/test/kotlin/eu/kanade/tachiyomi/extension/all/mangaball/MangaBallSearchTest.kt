@@ -109,11 +109,22 @@ class MangaBallSearchTest {
     // ------------------------------------------------------------------ variants
 
     @Test
-    fun `variant list contains the words of the query and the squashed form`() {
+    fun `variant list offers the distinctive word of the query`() {
+        // "mieruko-ct" trails off; "mieruko" alone is what makes the server find Mieruko-chan.
         val variants = SmartSearch.candidateQueries("mieruko-ct")
         assertTrue("expected 'mieruko' in $variants", "mieruko" in variants)
-        val squashed = SmartSearch.candidateQueries("one peice")
-        assertTrue("expected 'onepiece' in $squashed", "onepiece" in squashed)
+    }
+
+    @Test
+    fun `variant list corrects a typo inside the phrase`() {
+        // "one peice" must be retried as "one piece", not as the squashed typo "onepeice".
+        val variants = SmartSearch.candidateQueries("one peice")
+        assertTrue("expected 'one piece' in $variants", "one piece" in variants)
+    }
+
+    @Test
+    fun `variant list removes spaces the user typed`() {
+        assertTrue("sololeveling" in SmartSearch.candidateQueries("solo leveling"))
     }
 
     @Test
@@ -133,7 +144,7 @@ class MangaBallSearchTest {
     @Test
     fun `variant list stays short and avoids blank entries`() {
         val variants = SmartSearch.candidateQueries("mieruko-ct")
-        assertTrue(variants.size <= 8)
+        assertTrue(variants.size <= 12)
         assertTrue(variants.none { it.isBlank() })
         assertTrue(SmartSearch.candidateQueries("").isEmpty())
     }

@@ -116,7 +116,7 @@ internal object SmartSearch {
      * fuzzy search happily completes "mieruko" into "Mieruko-chan"), the words squashed together,
      * then shorter prefixes and single-character typos of the longest word.
      */
-    fun candidateQueries(query: String, limit: Int = 8): List<String> {
+    fun candidateQueries(query: String, limit: Int = 12): List<String> {
         val normalized = normalize(query)
         val words = tokens(normalized)
         if (words.isEmpty()) return emptyList()
@@ -127,28 +127,50 @@ internal object SmartSearch {
             if (clean.isNotEmpty() && normalize(clean) != normalized) candidates += clean
         }
 
-        words.sortedByDescending { it.length }
-            .filter { it.length >= 4 }
-            .forEach { offer(it) }
+        val byLength = words.sortedByDescending { it.length }
+        // 1. Each word on its own. The server's fuzzy search completes "mieruko" into
+        //    "Mieruko-chan", so a query that trails off ("mieruko-ct") is best answered by its
+        //    most distinctive word.
+        byLength.filter { it.length >= 4 }.forEach { offer(it) }
+
+        val longest = byLength.first()
+        val longestIndex = words.indexOf(longest)
+        fun withLongestReplaced(replacement: String) {
+            offer(words.toMutableList().also { it[longestIndex] = replacement }.joinToString(" "))
+        }
+
+        // 2. Spaces the user left out (or added): "solo leveling" -> "sololeveling".
         if (words.size > 1) offer(words.joinToString(""))
 
-        val longest = words.maxByOrNull { it.length }.orEmpty()
-        for (cut in 1..2) {
-            if (longest.length - cut >= 4) offer(longest.dropLast(cut))
+        // 3. A word that was cut short or mistyped near its end ("naruto shippu" -> "naruto
+        //    shipp" -> "naruto ship"): the server completes a correct prefix.
+        for (cut in 1..3) {
+            if (longest.length - cut >= 4) withLongestReplaced(longest.dropLast(cut))
         }
-        // Adjacent transpositions are by far the most common typo ("nartuo", "peice").
+
+        // 4. Adjacent transpositions, the most common typo of all ("peice" -> "piece",
+        //    "nartuo" -> "naruto"). Replacing the word inside the query keeps the rest intact,
+        //    so "one peice" is retried as "one piece".
+        var swaps = 0
         for (index in 0 until longest.length - 1) {
             if (longest[index] == longest[index + 1]) continue
-            offer(
+            if (swaps >= 6) break
+            swaps++
+            withLongestReplaced(
                 longest.substring(0, index) +
                     longest[index + 1] +
                     longest[index] +
                     longest.substring(index + 2),
             )
         }
-        // A doubled letter is the other classic one.
+
+        // 5. A letter typed twice: "narutto" -> "naruto".
+        var collapses = 0
         for (index in 0 until longest.length - 1) {
-            if (longest[index] == longest[index + 1]) offer(longest.removeRange(index, index + 1))
+            if (longest[index] != longest[index + 1]) continue
+            if (collapses >= 3) break
+            collapses++
+            withLongestReplaced(longest.removeRange(index, index + 1))
         }
 
         return candidates.take(limit)
