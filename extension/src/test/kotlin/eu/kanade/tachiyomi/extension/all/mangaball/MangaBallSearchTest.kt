@@ -229,4 +229,48 @@ class MangaBallSearchTest {
         // Distance work is abandoned as soon as it cannot stay under the cap.
         assertEquals(7, SmartSearch.editDistance("a", "abcdefghijklmnop", 6))
     }
+
+    // ------------------------------------------------------- alternative titles
+
+    @Test
+    fun `an alternative title late in the list is still kept and matched`() {
+        // The API lists one alternative title per translation a work is known by, and the one a
+        // reader knows is often not among the first few. Keeping only the first dozen dropped it:
+        // the work was in the server's answer, scored as "nothing like what was typed" and was
+        // filtered off the page the user saw.
+        val raw = (1..30).map { "Langsames Ding $it" } + listOf("The Girl Who Can See Them")
+        val kept = altTitlesToKeep(raw)
+        assertTrue("The Girl Who Can See Them" in kept)
+        assertEquals(1.0, SmartSearch.score("the girl who can see them", kept), 0.001)
+    }
+
+    @Test
+    fun `a work known only by an alternative title outranks the junk`() {
+        val pool = listOf(
+            "junk-a" to listOf("Love Diary (Hanna)"),
+            "right" to listOf("The Girl Who Can See Them", "見える子ちゃん"),
+            "junk-b" to listOf("I Can See the Titles"),
+        )
+        val ranked = SmartSearch.rank("the girl who can see them", pool) { it.second }
+        assertEquals(listOf("right"), ranked.map { it.first })
+    }
+
+    @Test
+    fun `kept alternative titles are trimmed deduplicated and bounded`() {
+        val raw = listOf(" Mieruko-chan ", "Mieruko-chan", "", "   ") +
+            (1..100).map { "Beam title $it" }
+        val kept = altTitlesToKeep(raw)
+        assertEquals("Mieruko-chan", kept.first())
+        assertEquals(1, kept.count { it == "Mieruko-chan" })
+        assertTrue(kept.none { it.isBlank() })
+        assertTrue(kept.size <= ALT_TITLE_COUNT)
+        assertTrue(kept.sumOf { it.length } <= ALT_TITLE_CHARS)
+    }
+
+    @Test
+    fun `one huge alternative title is shortened instead of eating the budget`() {
+        val kept = altTitlesToKeep(listOf("x".repeat(500), "Short one"))
+        assertEquals(ALT_TITLE_LENGTH, kept.first().length)
+        assertTrue("Short one" in kept)
+    }
 }

@@ -106,13 +106,10 @@ internal fun JsonObject.toSManga(): SManga {
     val slug = string("slug").orEmpty()
     val titleTags = tags()
     MangaBallCatalog.learn(titleTags)
-    // Alternative titles are kept (shortened and capped) because searching for "mieruko",
-    // "The Girl Who Can See Them" or "見える子ちゃん" must all find the same entry.
-    val altTitles = strings("alternateName")
-        .map { it.trim().take(90) }
-        .filter { it.isNotEmpty() }
-        .distinct()
-        .take(12)
+    // Every alternative title is kept: a work must be findable by any of the names it is known
+    // by ("mieruko", "The Girl Who Can See Them", "見える子ちゃん") - and the site
+    // lists the one a reader happens to know surprisingly late (see [altTitlesToKeep]).
+    val altTitles = altTitlesToKeep(strings("alternateName"))
 
     return SManga.create().apply {
         url = slug.ifBlank { titleId }
@@ -136,6 +133,7 @@ internal fun JsonObject.toMangaDetails(): SManga {
     val titleTags = tags()
     MangaBallCatalog.learn(titleTags)
     val altNames = strings("alternateName")
+    val altTitles = altTitlesToKeep(altNames)
     val descriptionParts = strings("description")
     val authors = (arr("author") ?: arr("authors"))?.mapNotNull { it.asObject()?.string("name") }.orEmpty()
 
@@ -167,6 +165,7 @@ internal fun JsonObject.toMangaDetails(): SManga {
             put("langs", buildJsonArray { availableLanguages().forEach { add(JsonPrimitive(it)) } })
             put("tags", buildJsonArray { titleTags.forEach { add(JsonPrimitive(it.id)) } })
             put("tagNames", buildJsonArray { titleTags.forEach { add(JsonPrimitive(it.name)) } })
+            put("altTitles", buildJsonArray { altTitles.forEach { add(JsonPrimitive(it)) } })
             put("adult", bool("is18plus") ?: false)
         }
     }

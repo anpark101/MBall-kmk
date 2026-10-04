@@ -106,6 +106,7 @@ internal class MangaBallSource(
 
         val sortFilter = filters.ofType<SortFilter>()
         val keywordSearch = keyword.isNotBlank()
+        val smartSearch = preferences.getBoolean(PREF_SMART_SEARCH, true)
 
         // Text searches are sent in the site's relevance order. The "Sort by" filter defaults to
         // "Latest updated" and cannot be told apart from a deliberate choice by the framework, so
@@ -117,7 +118,7 @@ internal class MangaBallSource(
         val sortBy: String? = resolveSortBy(
             syntaxSort = syntax.sortBy,
             keywordSearch = keywordSearch,
-            smartSearch = preferences.getBoolean(PREF_SMART_SEARCH, true),
+            smartSearch = smartSearch,
             chosenSort = sortFilter?.chosenSortBy,
             forcedSort = forcedSort,
             defaultSort = SearchSyntax.DEFAULT_SORT,
@@ -183,9 +184,37 @@ internal class MangaBallSource(
             currentPage++
         }
 
+        // A text search that found nothing close to what was typed is usually a title the site
+        // ranked below its loose word matches - an alternative title is the classic case, and
+        // such a query can have tens of thousands of barely related answers. Score the next
+        // pages as well, so the work that is known by exactly that title is still found. Bounded,
+        // only on the first page, and skipped when a specific depth was asked for.
+        if (keywordSearch && smartSearch && page == 1 && syntax.deepPages == null) {
+            while (shouldFetchMorePages(bestScore(keyword, collected), fetched, AUTO_DEPTH, hasNextPage)) {
+                val url = buildSearchUrl(
+                    page = currentPage,
+                    keyword = keyword,
+                    sortBy = sortBy,
+                    sortOrder = sortOrder,
+                    tagMode = tagMode,
+                    includedTags = includedTags,
+                    excludedTags = excludedTags,
+                    type = type,
+                    status = status,
+                    demographic = demographic,
+                    adultMode = adultMode,
+                )
+                val (items, more) = fetchSearchPage(url)
+                items.forEach { collected.putIfAbsent(it.url, it) }
+                hasNextPage = more
+                fetched++
+                currentPage++
+            }
+        }
+
         var results: List<SManga> = collected.values.toList()
 
-        if (keywordSearch && preferences.getBoolean(PREF_SMART_SEARCH, true)) {
+        if (keywordSearch && smartSearch) {
             results = refineForQuery(
                 query = keyword,
                 items = results,
@@ -486,9 +515,11 @@ internal class MangaBallSource(
             summary = "Drops results that do not match what you typed, ignores accents, hyphens " +
                 "and missing spaces, and retries close spellings when nothing matches " +
                 "(\"mieruko-ct\" finds Mieruko-chan, \"bad thinkin\" finds Bad Thinking Diary). " +
-                "Text searches are ranked by relevance instead of the date order the Sort by " +
-                "filter would give them - reorder them with \"Result ordering (local)\". " +
-                "Turn off to see the site's raw answer."
+                "A work is also found by any of its alternative titles, in any language. Text " +
+                "searches are ranked by relevance instead of the date order the Sort by filter " +
+                "would give them, and a search that finds nothing close looks a couple of pages " +
+                "deeper. Reorder the results with \"Result ordering (local)\". Turn off to see " +
+                "the site's raw answer."
             setDefaultValue(true)
         }.also(screen::addPreference)
 
@@ -525,7 +556,8 @@ internal class MangaBallSource(
         EditTextPreference(screen.context).apply {
             key = PREF_DEPTH
             title = "Search depth (1-5 pages)"
-            summary = "How many result pages a single search merges. Higher is slower but finds more."
+            summary = "How many result pages a single search merges. Higher is slower but finds " +
+                "more. Smart search adds up to two pages of its own when nothing matches."
             setDefaultValue("1")
         }.also(screen::addPreference)
 

@@ -338,4 +338,19 @@ class MangaBallLogicTest {
         untouched.state = Filter.Sort.Selection(0, true)
         assertEquals("lastupdate", untouched.chosenSortBy)
     }
+
+    // ------------------------------------------------------- deeper look
+
+    @Test
+    fun `a search with nothing close looks a couple of pages deeper`() {
+        assertTrue(shouldFetchMorePages(best = 0.2, pagesFetched = 1, autoDepth = 3, hasMore = true))
+        assertTrue(shouldFetchMorePages(best = 0.79, pagesFetched = 1, autoDepth = 3, hasMore = true))
+    }
+
+    @Test
+    fun `a search that already matched, or has no more pages, stops`() {
+        assertFalse(shouldFetchMorePages(best = 0.9, pagesFetched = 1, autoDepth = 3, hasMore = true))
+        assertFalse(shouldFetchMorePages(best = 0.2, pagesFetched = 3, autoDepth = 3, hasMore = true))
+        assertFalse(shouldFetchMorePages(best = 0.2, pagesFetched = 1, autoDepth = 3, hasMore = false))
+    }
 }

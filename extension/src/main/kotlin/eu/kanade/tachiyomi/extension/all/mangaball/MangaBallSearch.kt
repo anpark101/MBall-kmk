@@ -303,6 +303,40 @@ internal object SmartSearch {
 /** The texts a result is known by: its title plus every alternative title. */
 internal fun SManga.searchTexts(): List<String> = listOf(title) + memoAltTitles()
 
+// ---------------------------------------------------------------------------
+// Alternative titles
+// ---------------------------------------------------------------------------
+
+/**
+ * How many alternative titles are remembered per work, and how much text they may take up.
+ *
+ * The API lists one alternative title per translation a work is known by - 20 to 50 of them is
+ * normal, and *any* of them can be what a reader types. Keeping only the first dozen (the site
+ * lists the English one surprisingly late) silently broke the rest: the work was in the answer,
+ * scored as "nothing like what was typed" and was then dropped from the page.
+ */
+internal const val ALT_TITLE_COUNT = 48
+internal const val ALT_TITLE_CHARS = 3000
+internal const val ALT_TITLE_LENGTH = 140
+
+/**
+ * The alternative titles worth keeping, in the order the site lists them: trimmed, deduplicated
+ * and bounded ([ALT_TITLE_COUNT] entries, [ALT_TITLE_CHARS] characters in total, at most
+ * [ALT_TITLE_LENGTH] characters each).
+ */
+internal fun altTitlesToKeep(raw: List<String>): List<String> {
+    val kept = LinkedHashSet<String>()
+    var used = 0
+    for (title in raw) {
+        if (kept.size >= ALT_TITLE_COUNT) break
+        val clean = title.trim().take(ALT_TITLE_LENGTH)
+        if (clean.isEmpty() || used + clean.length > ALT_TITLE_CHARS) continue
+        if (!kept.add(clean)) continue
+        used += clean.length
+    }
+    return kept.toList()
+}
+
 /** Score of a search result against the query. */
 internal fun scoreManga(query: String, manga: SManga): Double =
     SmartSearch.score(query, manga.searchTexts())

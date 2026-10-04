@@ -115,7 +115,11 @@ checked against what you typed, and only the ones that really match stay:
 - accents, hyphens and punctuation are ignored — `mieruko-chan`, `mieruko chan` and `mierukō` all match;
 - missing or extra spaces do not matter — `sololeveling` finds *Solo Leveling*;
 - a close spelling is retried — `one peice` finds *One Piece*, `nartuo` finds *Naruto*;
-- a title's alternative names count too, so `the girl who can see them` finds *Mieruko-chan*;
+- a work is found by **any of its alternative titles**, in any language — the names listed
+  under *Alternative titles* when you open it (`the girl who can see them`, `見える子ちゃん`
+  and `death is the only ending for the villain` all find their work);
+- a search that finds nothing close looks one or two pages deeper before giving up, because
+  the site's own ranking is a loose word match;
 - unrelated results are dropped only when something better exists, so searching an author or a
   story keyword still gives you the site's own answer, unfiltered.
 
@@ -238,6 +242,7 @@ in about three minutes.
 | The extension vanishes right after you trust it, or is not listed at all | Follow **section 10** — it is written as a checklist, in order. Short version: uninstall the old extension first (older builds used a different signing key), install the newest APK, check Android *Settings → Apps* for the version, and enable *Show NSFW sources* for builds older than v1.6.9. |
 | (old note) Fixed since v1.6.9. Earlier builds were flagged as NSFW, and both Komikku and Mihon silently drop NSFW-flagged extensions while *Settings → Browse → Show NSFW sources* is off. Either update to v1.6.9+, or enable that toggle (Komikku: Settings → Browse → **NSFW content → Show NSFW sources**, then restart the app) and trust the extension again. |
 | Extension loaded, but no source in Browse | The app hides sources whose language is not enabled. Komikku: Settings → Browse → **Languages** → enable the languages you want; then restart. |
+| A work is not found by one of its alternative titles | Update to **v1.6.25 or newer**. Earlier builds remembered only the first 12 alternative titles of each work, so the name you typed (often a later one) was not recognised and the work was filtered off the page. |
 | Search returns nothing | Clear the included tags / switch Tag mode from AND to OR — very specific combinations genuinely have no results. |
 | "HTTP 403" or a Cloudflare page | Enable **Use Cloudflare bypass client** in the source settings. |
 | "App not installed" when updating | You are installing an APK with a different signature — uninstall the old extension first (the library entries can be re-added afterwards). |

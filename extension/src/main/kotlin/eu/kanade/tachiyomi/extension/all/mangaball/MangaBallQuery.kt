@@ -51,6 +51,25 @@ internal fun resolveSortBy(
     else -> chosenSort ?: forcedSort ?: defaultSort
 }
 
+/**
+ * How many result pages a text search may merge when the first page held nothing close to it.
+ *
+ * The site's search is a loose word match - a query can legitimately return tens of thousands of
+ * barely related entries - so the work that is known by exactly that title (an alternative title
+ * is the classic case) can sit below the first page. Two more pages are pooled and scored as a
+ * whole. Bounded: only for the first page, only under Smart search, and only while the result set
+ * holds no strong match.
+ */
+internal const val AUTO_DEPTH = 3
+
+/** True when a text search should look at the next result page before giving up. */
+internal fun shouldFetchMorePages(
+    best: Double,
+    pagesFetched: Int,
+    autoDepth: Int,
+    hasMore: Boolean,
+): Boolean = hasMore && pagesFetched < autoDepth && best < SmartSearch.STRONG
+
 internal object SearchSyntax {
 
     private val TOKEN = Regex("""(?:^|\s)-?[A-Za-z_]+:(?:"[^"]*"|\S+)""")
