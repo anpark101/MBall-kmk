@@ -200,6 +200,7 @@ class MangaBallSearchTest {
         assertEquals(1, SmartSearch.editDistance("nartuo", "naruto", 6))
         assertEquals(1, SmartSearch.editDistance("peice", "piece", 6))
         assertEquals(2, SmartSearch.editDistance("", "ab", 6))
-        assertEquals(7, SmartSearch.editDistance("naruto", "bleach", 6)) // above the cap
+        // Distance work is abandoned as soon as it cannot stay under the cap.
+        assertEquals(7, SmartSearch.editDistance("a", "abcdefghijklmnop", 6))
     }
 }
