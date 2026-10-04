@@ -248,4 +248,94 @@ class MangaBallLogicTest {
         val order = rankingPermutation(rows, "focus_tag", "", "", emptyList())
         assertEquals(listOf(0, 1, 2), order)
     }
+
+    // ------------------------------------------------------- search ordering
+
+    @Test
+    fun `a text search is ranked by relevance not by the default date sort`() {
+        // The Sort by filter defaults to "Latest updated". Reading it directly was the bug: a
+        // search for a title came back as "whatever was updated in the last few minutes".
+        assertNull(
+            resolveSortBy(
+                syntaxSort = null,
+                keywordSearch = true,
+                smartSearch = true,
+                chosenSort = null,
+                forcedSort = null,
+                defaultSort = "lastupdate",
+            ),
+        )
+    }
+
+    @Test
+    fun `a sort token written in the query box is still honoured`() {
+        assertEquals(
+            "views",
+            resolveSortBy(
+                syntaxSort = "views",
+                keywordSearch = true,
+                smartSearch = true,
+                chosenSort = null,
+                forcedSort = null,
+                defaultSort = "lastupdate",
+            ),
+        )
+    }
+
+    @Test
+    fun `with smart search off the sort filter is read again`() {
+        assertEquals(
+            "rating",
+            resolveSortBy(
+                syntaxSort = null,
+                keywordSearch = true,
+                smartSearch = false,
+                chosenSort = "rating",
+                forcedSort = null,
+                defaultSort = "lastupdate",
+            ),
+        )
+    }
+
+    @Test
+    fun `feeds keep their own ordering while the sort filter is untouched`() {
+        assertEquals(
+            "views",
+            resolveSortBy(
+                syntaxSort = null,
+                keywordSearch = false,
+                smartSearch = true,
+                chosenSort = null,
+                forcedSort = "views",
+                defaultSort = "lastupdate",
+            ),
+        )
+        // ...but a deliberately picked sort wins over it.
+        assertEquals(
+            "rating",
+            resolveSortBy(
+                syntaxSort = null,
+                keywordSearch = false,
+                smartSearch = true,
+                chosenSort = "rating",
+                forcedSort = "views",
+                defaultSort = "lastupdate",
+            ),
+        )
+    }
+
+    @Test
+    fun `the sort filter tells an untouched default apart from a real choice`() {
+        val untouched = SortFilter()
+        assertNull(untouched.chosenSortBy)
+
+        untouched.state = Filter.Sort.Selection(0, false)
+        assertNull("'Latest updated' descending is the default", untouched.chosenSortBy)
+
+        untouched.state = Filter.Sort.Selection(1, false)
+        assertEquals("views", untouched.chosenSortBy)
+
+        untouched.state = Filter.Sort.Selection(0, true)
+        assertEquals("lastupdate", untouched.chosenSortBy)
+    }
 }

@@ -24,6 +24,33 @@ internal data class SearchOptions(
     val deepPages: Int? = null,
 )
 
+/**
+ * Which `sort_by` a request should carry, or null for the site's own relevance order.
+ *
+ * The subtlety that made text searches useless: the "Sort by" filter's default is
+ * *Latest updated*, and a filter that was never touched is indistinguishable from one the user
+ * deliberately set - [SortFilter.chosenSortBy] exists to tell those apart (it returns null while
+ * the filter sits at its default). A text search must live in the site's relevance order: its
+ * fuzzy answer contains a hundred loosely related titles, and putting those in date order is
+ * exactly what buries the title that was typed.
+ */
+internal fun resolveSortBy(
+    syntaxSort: String?,
+    keywordSearch: Boolean,
+    smartSearch: Boolean,
+    chosenSort: String?,
+    forcedSort: String?,
+    defaultSort: String,
+): String? = when {
+    // "sort:views" written in the query box is an explicit instruction - always honoured.
+    syntaxSort != null -> syntaxSort
+    // A text search is relevance-ranked; "Result ordering (local)" reorders what was found.
+    keywordSearch && smartSearch -> null
+    keywordSearch -> chosenSort
+    // Popular / Latest feeds keep their own ordering unless a sort was deliberately picked.
+    else -> chosenSort ?: forcedSort ?: defaultSort
+}
+
 internal object SearchSyntax {
 
     private val TOKEN = Regex("""(?:^|\s)-?[A-Za-z_]+:(?:"[^"]*"|\S+)""")

@@ -39,6 +39,19 @@ internal class SortFilter : Filter.Sort(
     val sortBy: String get() = SORT_VALUES.getOrNull(state?.index ?: 0) ?: SORT_VALUES[0]
     val sortOrder: String get() = if (state?.ascending == true) "asc" else "desc"
 
+    /**
+     * The sort the user actually picked, or null while the filter still sits at its default
+     * ("Latest updated", descending). Filters carry no "was this changed" flag, so the default
+     * selection has to be recognised by value - otherwise an untouched filter silently forces
+     * every search into date order.
+     */
+    val chosenSortBy: String?
+        get() {
+            val selection = state ?: return null
+            if ((selection.index ?: 0) == 0 && selection.ascending != true) return null
+            return sortBy
+        }
+
     companion object {
         private val SORT_VALUES = arrayOf("lastupdate", "views", "rating", "created_at", "name")
     }

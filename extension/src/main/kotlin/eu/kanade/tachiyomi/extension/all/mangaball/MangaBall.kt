@@ -105,17 +105,23 @@ internal class MangaBallSource(
             .joinToString(" ")
 
         val sortFilter = filters.ofType<SortFilter>()
-        val explicitSortBy = syntax.sortBy ?: sortFilter?.sortBy
-
-        // A keyword search must never be forced into "recently updated" order. The site's fuzzy
-        // search can return a hundred loosely related titles, and sorting those by date is what
-        // buries the title the user actually asked for (that is how a search for "mieruko-ct"
-        // ended up showing "Super! Makoto-Chan" and friends). With no sort_by the API ranks by
-        // its own relevance score, which puts the real match first. An explicit user sort - the
-        // Sort by filter or a `sort:` token - is still honoured.
         val keywordSearch = keyword.isNotBlank()
-        val sortBy: String? = explicitSortBy
-            ?: if (keywordSearch) null else (forcedSort ?: SearchSyntax.DEFAULT_SORT)
+
+        // Text searches are sent in the site's relevance order. The "Sort by" filter defaults to
+        // "Latest updated" and cannot be told apart from a deliberate choice by the framework, so
+        // reading it directly turned every search into "whatever was updated in the last few
+        // minutes that loosely matches" - a search for "bad thinking diary" came back with
+        // "Strategy Guide for a Merry Bad Ending" while the title itself was nowhere in the page.
+        // The filter still orders the Popular / Latest feeds; `sort:` in the query box is always
+        // honoured, and found results can be reordered with "Result ordering (local)".
+        val sortBy: String? = resolveSortBy(
+            syntaxSort = syntax.sortBy,
+            keywordSearch = keywordSearch,
+            smartSearch = preferences.getBoolean(PREF_SMART_SEARCH, true),
+            chosenSort = sortFilter?.chosenSortBy,
+            forcedSort = forcedSort,
+            defaultSort = SearchSyntax.DEFAULT_SORT,
+        )
         val sortOrder: String? =
             if (sortBy == null) null else (syntax.sortOrder ?: sortFilter?.sortOrder ?: "desc")
 
@@ -185,12 +191,14 @@ internal class MangaBallSource(
                 items = results,
                 adultMode = adultMode,
                 adultRescue = preferences.getBoolean(PREF_ADULT_RESCUE, true),
+                // Probes are always relevance-ranked: they exist to *find* the title, and a
+                // date (or any other) sort can leave it outside the first page entirely.
                 urlFor = { variant, mode ->
                     buildSearchUrl(
                         page = 1,
                         keyword = variant,
-                        sortBy = sortBy,
-                        sortOrder = sortOrder,
+                        sortBy = null,
+                        sortOrder = null,
                         tagMode = tagMode,
                         includedTags = includedTags,
                         excludedTags = excludedTags,
@@ -478,6 +486,8 @@ internal class MangaBallSource(
             summary = "Drops results that do not match what you typed, ignores accents, hyphens " +
                 "and missing spaces, and retries close spellings when nothing matches " +
                 "(\"mieruko-ct\" finds Mieruko-chan, \"bad thinkin\" finds Bad Thinking Diary). " +
+                "Text searches are ranked by relevance instead of the date order the Sort by " +
+                "filter would give them - reorder them with \"Result ordering (local)\". " +
                 "Turn off to see the site's raw answer."
             setDefaultValue(true)
         }.also(screen::addPreference)
