@@ -176,6 +176,42 @@ class MangaBallSearchTest {
     }
 
     @Test
+    fun `a word that lost its last letter is retried with it added`() {
+        assertEquals("bad thinking", SmartSearch.candidateQueries("bad thinkin").first())
+        assertEquals("thinking", SmartSearch.candidateQueries("thinkin").first())
+    }
+
+    @Test
+    fun `a word that is simply not there is not a match`() {
+        // "There Are No Bad Warriors in This World" shares only the word "bad" - that is not the
+        // title the user typed, and it must not survive next to the real one.
+        assertTrue(score("bad thinkin", "There Are No Bad Warriors in This World") < 0.34)
+        assertTrue(score("bad thinkin", "The Dangers in My Heart") < 0.34)
+        assertTrue(score("bad thinkin", "Bad Thinking Diary") >= 0.9)
+    }
+
+    @Test
+    fun `the reported junk list keeps only the title that was typed`() {
+        // The real first page for "bad thinkin", straight from the site.
+        val pool = listOf(
+            "There Are No Bad Warriors in This World",
+            "The Dangers in My Heart",
+            "24 Hours Resurrection of the Villainess",
+            "Bad Thinking Diary",
+        )
+        assertEquals(listOf("Bad Thinking Diary"), rank("bad thinkin", pool))
+    }
+
+    @Test
+    fun `a search that found nothing looks at 18+ titles when the filter is on`() {
+        assertTrue(SmartSearch.needsAdultRescue(0.0, SmartSearch.ADULT_MODE_SAFE, true))
+        assertTrue(SmartSearch.needsAdultRescue(0.2, SmartSearch.ADULT_MODE_SAFE, true))
+        assertTrue(!SmartSearch.needsAdultRescue(0.9, SmartSearch.ADULT_MODE_SAFE, true))
+        assertTrue(!SmartSearch.needsAdultRescue(0.0, SmartSearch.ADULT_MODE_ALL, true))
+        assertTrue(!SmartSearch.needsAdultRescue(0.0, SmartSearch.ADULT_MODE_SAFE, false))
+    }
+
+    @Test
     fun `empty result sets are returned as is`() {
         assertEquals(emptyList<String>(), rank("naruto", emptyList()))
         val single = listOf("Naruto")

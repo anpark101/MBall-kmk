@@ -53,6 +53,7 @@ private const val PREF_ALL_CHAPTER_LANGUAGES = "pref_all_chapter_languages"
 private const val PREF_DEPTH = "pref_search_depth"
 private const val PREF_SCANLATOR_BLACKLIST = "pref_scanlator_blacklist"
 private const val PREF_SMART_SEARCH = "pref_smart_search"
+private const val PREF_ADULT_RESCUE = "pref_adult_rescue"
 
 internal class MangaBallSource(
     override val lang: String,
@@ -130,7 +131,11 @@ internal class MangaBallSource(
         val demographic = syntax.demographic ?: filters.ofType<DemographicFilter>()?.selected.orEmpty()
         val adultMode = syntax.adultMode
             ?: filters.ofType<AdultFilter>()?.selected
-            ?: if (preferences.getBoolean(PREF_HIDE_NSFW, true)) "no_18" else "all"
+            ?: if (preferences.getBoolean(PREF_HIDE_NSFW, true)) {
+                SmartSearch.ADULT_MODE_SAFE
+            } else {
+                SmartSearch.ADULT_MODE_ALL
+            }
 
         // Languages are matched against each result locally: the API parameter for this is
         // not documented and a wrong value would silently return nothing.
@@ -178,7 +183,9 @@ internal class MangaBallSource(
             results = refineForQuery(
                 query = keyword,
                 items = results,
-                urlForVariant = { variant ->
+                adultMode = adultMode,
+                adultRescue = preferences.getBoolean(PREF_ADULT_RESCUE, true),
+                urlFor = { variant, mode ->
                     buildSearchUrl(
                         page = 1,
                         keyword = variant,
@@ -190,7 +197,7 @@ internal class MangaBallSource(
                         type = type,
                         status = status,
                         demographic = demographic,
-                        adultMode = adultMode,
+                        adultMode = mode,
                     )
                 },
             )
@@ -250,30 +257,61 @@ internal class MangaBallSource(
     private suspend fun refineForQuery(
         query: String,
         items: List<SManga>,
-        urlForVariant: (String) -> HttpUrl,
+        adultMode: String,
+        adultRescue: Boolean,
+        urlFor: (String, String) -> HttpUrl,
     ): List<SManga> {
         val pool = LinkedHashMap<String, SManga>()
         items.forEach { pool[it.url] = it }
 
-        var best = pool.values.maxOfOrNull { scoreManga(query, it) } ?: 0.0
-        if (best >= SmartSearch.KEEP) return rankMangas(query, pool.values.toList())
+        var best = probeVariants(query, pool, bestScore(query, pool), adultMode, urlFor)
 
-        val variants = SmartSearch.candidateQueries(query)
-        for (index in 0 until minOf(variants.size, SmartSearch.MAX_PROBES)) {
-            val variant = variants[index]
-            val extra = try {
-                fetchSearchPage(urlForVariant(variant)).first
-            } catch (cancellation: CancellationException) {
-                throw cancellation
-            } catch (_: Exception) {
-                continue // a variant that fails (Cloudflare, timeout) must not fail the search
+        // Nothing in the answer looks like what was typed. If the 18+ filter is on, the title may
+        // have been removed by the server before it was ever seen - send the same query once more
+        // with 18+ titles allowed, so that a title known by name can never be invisible (a search
+        // for "bad thinking diary" returns nothing at all while that filter is on).
+        if (SmartSearch.needsAdultRescue(best, adultMode, adultRescue)) {
+            fetchOrEmpty(urlFor(query, SmartSearch.ADULT_MODE_ALL))
+                .forEach { pool.putIfAbsent(it.url, it) }
+            best = bestScore(query, pool)
+            if (best < SmartSearch.STRONG) {
+                probeVariants(query, pool, best, SmartSearch.ADULT_MODE_ALL, urlFor)
             }
-            extra.forEach { pool.putIfAbsent(it.url, it) }
-            best = pool.values.maxOfOrNull { scoreManga(query, it) } ?: 0.0
-            if (best >= SmartSearch.STRONG) break
         }
 
         return rankMangas(query, pool.values.toList())
+    }
+
+    private fun bestScore(query: String, pool: Map<String, SManga>): Double =
+        pool.values.maxOfOrNull { scoreManga(query, it) } ?: 0.0
+
+    /** Asks the server for the typo variants of the query, adding whatever it returns to [pool]. */
+    private suspend fun probeVariants(
+        query: String,
+        pool: LinkedHashMap<String, SManga>,
+        bestSoFar: Double,
+        adultMode: String,
+        urlFor: (String, String) -> HttpUrl,
+    ): Double {
+        var best = bestSoFar
+        if (best >= SmartSearch.KEEP) return best
+
+        val variants = SmartSearch.candidateQueries(query)
+        for (index in 0 until minOf(variants.size, SmartSearch.MAX_PROBES)) {
+            fetchOrEmpty(urlFor(variants[index], adultMode)).forEach { pool.putIfAbsent(it.url, it) }
+            best = bestScore(query, pool)
+            if (best >= SmartSearch.STRONG) break
+        }
+        return best
+    }
+
+    /** A failed probe (Cloudflare, timeout, one odd page) must never fail the whole search. */
+    private suspend fun fetchOrEmpty(url: HttpUrl): List<SManga> = try {
+        fetchSearchPage(url).first
+    } catch (cancellation: CancellationException) {
+        throw cancellation
+    } catch (_: Exception) {
+        emptyList()
     }
 
     private suspend fun fetchSearchPage(url: HttpUrl): Pair<List<SManga>, Boolean> {
@@ -429,7 +467,8 @@ internal class MangaBallSource(
         SwitchPreferenceCompat(screen.context).apply {
             key = PREF_HIDE_NSFW
             title = "Hide 18+ titles"
-            summary = "Ask the server to leave out titles marked as 18+. Recommended."
+            summary = "Ask the server to leave out titles marked as 18+. A search that would come " +
+                "back empty still looks at them (see the switch below). Recommended."
             setDefaultValue(true)
         }.also(screen::addPreference)
 
@@ -438,7 +477,17 @@ internal class MangaBallSource(
             title = "Smart search (typo tolerant)"
             summary = "Drops results that do not match what you typed, ignores accents, hyphens " +
                 "and missing spaces, and retries close spellings when nothing matches " +
-                "(\"mieruko-ct\" still finds Mieruko-chan). Turn off to see the site's raw answer."
+                "(\"mieruko-ct\" finds Mieruko-chan, \"bad thinkin\" finds Bad Thinking Diary). " +
+                "Turn off to see the site's raw answer."
+            setDefaultValue(true)
+        }.also(screen::addPreference)
+
+        SwitchPreferenceCompat(screen.context).apply {
+            key = PREF_ADULT_RESCUE
+            title = "Find 18+ titles when nothing else matches"
+            summary = "\"Hide 18+ titles\" stays in charge, except when a search finds nothing " +
+                "that looks like what you typed - then 18+ titles are searched too, so a title " +
+                "you know by name is never missing. Turn off for a strict 18+ filter."
             setDefaultValue(true)
         }.also(screen::addPreference)
 

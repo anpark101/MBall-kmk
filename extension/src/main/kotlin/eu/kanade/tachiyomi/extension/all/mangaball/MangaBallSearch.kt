@@ -14,7 +14,7 @@ import eu.kanade.tachiyomi.source.model.SManga
  *    that tolerates typos, missing spaces, hyphens, accents and word order,
  *  * [candidateQueries] - a short, ordered list of alternative spellings to retry on the server
  *    when nothing in the first answer looks like the query,
- *  * [rankForQuery] - the final filter + ordering of a result set.
+ *  * [rank] - the final filter + ordering of a result set.
  *
  * Everything here is plain Kotlin (no Android APIs beyond [SManga], which is a stub in tests), so
  * the whole scoring model is covered by unit tests.
@@ -32,6 +32,13 @@ internal object SmartSearch {
 
     /** How many extra requests one search may spend on typo variants. */
     const val MAX_PROBES: Int = 3
+
+    /** A word scoring below this is simply not present in the target at all. */
+    private const val MISSING: Double = 0.25
+
+    /** The server's "leave out 18+ titles" mode, and the one that includes everything. */
+    const val ADULT_MODE_SAFE: String = "no_18"
+    const val ADULT_MODE_ALL: String = "all"
 
     /**
      * Lowercases, strips accents and turns every run of punctuation or spaces into a single
@@ -81,22 +88,35 @@ internal object SmartSearch {
 
         val packedQuery = q.replace(" ", "")
         val packedTarget = t.replace(" ", "")
-        val joined = if (packedQuery.isEmpty() || packedTarget.isEmpty()) {
+        val longestPacked = maxOf(packedQuery.length, packedTarget.length)
+        val joined = if (packedQuery.isEmpty() || packedTarget.isEmpty() ||
+            kotlin.math.abs(packedQuery.length - packedTarget.length) > longestPacked * 0.4
+        ) {
+            // A typo cannot explain 40% of the string being absent.
             0.0
         } else {
-            1.0 - editDistance(packedQuery, packedTarget, 12).toDouble() /
-                maxOf(packedQuery.length, packedTarget.length)
+            1.0 - editDistance(packedQuery, packedTarget, 12).toDouble() / longestPacked
         }
 
         val perWord = qWords.map { word -> tWords.maxOf { candidate -> tokenSimilarity(word, candidate) } }
         val coverage = perWord.average()
 
-        return when {
-            qWords.size == 1 -> maxOf(joined, coverage)
-            // One word matches, the rest is missing: that is somebody else's title.
-            coverage < 0.5 -> coverage * 0.5
-            else -> maxOf(joined, coverage)
-        }.coerceIn(0.0, 1.0)
+        val penalized = if (perWord.any { it < MISSING } || coverage < 0.5) {
+            // A word that is simply not there ("bad thinkin" vs "There Are No Bad Warriors in
+            // This World") is not a typo, and one matching word out of two is somebody else's
+            // title - so the word-based score is halved. The packed-string score is kept,
+            // because "mieruko-ct" vs "Mieruko-chan" is still recognisable as a whole
+            // ("mierukoct" -> "mierukochan" is three edits).
+            coverage * 0.5
+        } else {
+            coverage
+        }
+
+        return if (qWords.size == 1) {
+            maxOf(joined, coverage).coerceIn(0.0, 1.0)
+        } else {
+            maxOf(joined, penalized).coerceIn(0.0, 1.0)
+        }
     }
 
     /** The best score over every text a result is known by (title + alternative titles). */
@@ -128,16 +148,21 @@ internal object SmartSearch {
         }
 
         val byLength = words.sortedByDescending { it.length }
-        // 1. Each word on its own. The server's fuzzy search completes "mieruko" into
-        //    "Mieruko-chan", so a query that trails off ("mieruko-ct") is best answered by its
-        //    most distinctive word.
-        byLength.filter { it.length >= 4 }.forEach { offer(it) }
-
         val longest = byLength.first()
         val longestIndex = words.indexOf(longest)
         fun withLongestReplaced(replacement: String) {
             offer(words.toMutableList().also { it[longestIndex] = replacement }.joinToString(" "))
         }
+
+        // 0. A word missing its final "g": "thinkin" -> "thinking", "nothin" -> "nothing". This is
+        //    the most common omission in English titles and the server finds the real title for
+        //    the completed word.
+        if (longest.length >= 4 && longest.endsWith("in")) withLongestReplaced(longest + "g")
+
+        // 1. Each word on its own. The server's fuzzy search completes "mieruko" into
+        //    "Mieruko-chan", so a query that trails off ("mieruko-ct") is best answered by its
+        //    most distinctive word.
+        byLength.filter { it.length >= 4 }.forEach { offer(it) }
 
         // 2. Spaces the user left out (or added): "solo leveling" -> "sololeveling".
         if (words.size > 1) offer(words.joinToString(""))
@@ -175,6 +200,15 @@ internal object SmartSearch {
 
         return candidates.take(limit)
     }
+
+    /**
+     * True when nothing in the result set looks like the query AND the 18+ filter is on, i.e. the
+     * title that was asked for may have been removed by the server before it was ever seen. In
+     * that case the search is repeated once with 18+ titles allowed, so that a title known by name
+     * can never be invisible. [rescueEnabled] is the user's switch for this.
+     */
+    fun needsAdultRescue(best: Double, adultMode: String, rescueEnabled: Boolean): Boolean =
+        rescueEnabled && adultMode == ADULT_MODE_SAFE && best < WEAK
 
     /**
      * Final pass over a result set:
@@ -241,12 +275,22 @@ internal object SmartSearch {
 
     private fun tokenSimilarity(a: String, b: String): Double {
         if (a == b) return 1.0
-        if (a.length >= 3 && b.startsWith(a)) return 0.95
-        if (b.length >= 3 && a.startsWith(b)) return 0.95
-        if (a.length >= 3 && b.contains(a)) return 0.90
+        val shorter = if (a.length <= b.length) a else b
+        val longer = if (a.length <= b.length) b else a
+        // "thinkin" vs "in" must not count as a match. A fragment of 4+ characters may match as
+        // a prefix or as a word inside a longer one ("mieruko" in "mieruko-chan").
+        if (shorter.length >= 4) {
+            if (longer.startsWith(shorter)) return 0.95
+            if (longer.contains(shorter)) return 0.90
+        }
+        // Shorter than half the longer word is a coincidence, not a half-typed word: "in" inside
+        // "thinkin" is not evidence. "ct" inside "chan" still is - the user was typing a word.
+        if (shorter.length * 2 < longer.length) return 0.0
+        // One typo is forgivable in a short word ("thinkin" -> "thinking" = 0.86); four changes
+        // across two different words ("thinkin" -> "there") are not a typo at all, which is why
+        // the distance is measured against the *shorter* word.
         val distance = editDistance(a, b, 6)
-        val longest = maxOf(a.length, b.length)
-        return (1.0 - distance.toDouble() / longest).coerceIn(0.0, 1.0)
+        return (1.0 - distance.toDouble() / shorter.length).coerceIn(0.0, 1.0)
     }
 }
 
