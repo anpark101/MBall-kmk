@@ -5,7 +5,7 @@ An improved source for **[mangaball.com](https://mangaball.com)** (the site form
 
 | You asked for | What this extension gives you |
 | --- | --- |
-| **Enhanced search** | A query language inside the search box: `tag:romance -tag:ecchi sort:views status:ongoing pages:3`, plus an extra-keyword field and an optional multi-page search depth |
+| **Enhanced search** | A query language inside the search box: `tag:romance -tag:ecchi sort:views status:ongoing pages:3`, plus an extra-keyword field and an optional multi-page search depth. Plain text is **relevance-first and typo tolerant**: `mieruko-ct` finds *Mieruko-chan*, `one peice` finds *One Piece*, `sololeveling` finds *Solo Leveling* |
 | **Sorting by genre** | *Sort by* (latest update / most viewed / top rated / recently added / title) **and** a local **Focus genre** ordering that floats your favourite genre to the top of the results |
 | **Sorting by tags** | Local **Focus tag** ordering and **Result ordering → Best tag match first**, which ranks results by how many of your included tags they carry |
 | **Including or excluding tags** | Every genre, theme, format and content tag is a **tri-state filter**: tap once = *include*, tap twice = *exclude*. Includes are combined with **AND / OR** logic, exclusions always subtract |
@@ -105,7 +105,24 @@ That is "the most popular English romance-dramas without ecchi, romance first".
 
 ---
 
-## 3. Enhanced search query language
+## 3. Enhanced search
+
+### Typo-tolerant, relevance-first title search
+
+Searching a title by plain text no longer answers with something else entirely. Every result is
+checked against what you typed, and only the ones that really match stay:
+
+- accents, hyphens and punctuation are ignored — `mieruko-chan`, `mieruko chan` and `mierukō` all match;
+- missing or extra spaces do not matter — `sololeveling` finds *Solo Leveling*;
+- a close spelling is retried — `one peice` finds *One Piece*, `nartuo` finds *Naruto*;
+- a title's alternative names count too, so `the girl who can see them` finds *Mieruko-chan*;
+- unrelated results are dropped only when something better exists, so searching an author or a
+  story keyword still gives you the site's own answer, unfiltered.
+
+This is the **Smart search (typo tolerant)** switch in the source settings (§4), on by default.
+Turn it off to see exactly what the site returns, untouched.
+
+### Extra query tokens
 
 Type these directly into the search box (they can be mixed with normal words):
 
@@ -136,6 +153,9 @@ treated as a normal keyword — searches never break because of a typo.
 Komikku → *MangaBall source* → ⚙️ (per-extension settings):
 
 - **Hide 18+ titles** — asks the server to leave out 18+ results.
+- **Smart search (typo tolerant)** — on by default. Relevance-first title matching that ignores
+  accents, hyphens and missing spaces, retries close spellings, and drops results that do not
+  match (see §3). Turn it off to see the site's raw, unfiltered answer.
 - **Only titles available in this source's language** — local filter on top of the results.
 - **Show chapters in every language** — off by default: an English source lists English chapters only.
 - **Use Cloudflare bypass client** — turn this on if searches fail with HTTP 403 or "Just a moment".
@@ -189,6 +209,7 @@ in about three minutes.
 | Symptom | Fix |
 | --- | --- |
 | Source shows a red *untrusted* marker | Extensions → Untrusted → tap the shield next to *MangaBall Enhanced*. |
+| Search shows unrelated titles, or the title I typed is missing | Update to **v1.6.22 or newer**, which matches and ranks results locally, and make sure **Smart search (typo tolerant)** is on in the source settings (it is by default). If one spelling still fails, try fewer words: `mieruko` instead of `mieruko-ct`. |
 | The extension vanishes right after you trust it, or is not listed at all | Follow **section 10** — it is written as a checklist, in order. Short version: uninstall the old extension first (older builds used a different signing key), install the newest APK, check Android *Settings → Apps* for the version, and enable *Show NSFW sources* for builds older than v1.6.9. |
 | (old note) Fixed since v1.6.9. Earlier builds were flagged as NSFW, and both Komikku and Mihon silently drop NSFW-flagged extensions while *Settings → Browse → Show NSFW sources* is off. Either update to v1.6.9+, or enable that toggle (Komikku: Settings → Browse → **NSFW content → Show NSFW sources**, then restart the app) and trust the extension again. |
 | Extension loaded, but no source in Browse | The app hides sources whose language is not enabled. Komikku: Settings → Browse → **Languages** → enable the languages you want; then restart. |
