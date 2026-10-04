@@ -119,6 +119,11 @@ checked against what you typed, and only the ones that really match stay:
 - unrelated results are dropped only when something better exists, so searching an author or a
   story keyword still gives you the site's own answer, unfiltered.
 
+A text search is also ordered by the site's own relevance: the *Sort by* filter, which starts on
+*Latest updated*, is only sent once you actually pick a value (or turn Smart search off). Before
+v1.6.24 that default was sent on every search, which is why results could read like a list of
+recently updated titles instead of answers to what you typed.
+
 This is the **Smart search (typo tolerant)** switch in the source settings (§4), on by default.
 Turn it off to see exactly what the site returns, untouched.
 
@@ -228,8 +233,8 @@ in about three minutes.
 | Symptom | Fix |
 | --- | --- |
 | Source shows a red *untrusted* marker | Extensions → Untrusted → tap the shield next to *MangaBall Enhanced*. |
-| The title I typed is not in the list, but it exists on the site | Update to **v1.6.23 or newer**. Before v1.6.23 an 18+ title was invisible while *Hide 18+ titles* was on, even when you typed its exact name (*Bad Thinking Diary* is flagged 18+). v1.6.23 retries a search that found nothing with 18+ titles included. Also make sure the search actually ran — see §3, the box only searches when you press the keyboard's search key. |
-| Search shows unrelated titles, or the title I typed is missing | Update to **v1.6.22 or newer**, which matches and ranks results locally, and make sure **Smart search (typo tolerant)** is on in the source settings (it is by default). If one spelling still fails, try fewer words: `mieruko` instead of `mieruko-ct`. |
+| The title I typed is not in the list, but it exists on the site | Update to **v1.6.24 or newer**. Before v1.6.23 an 18+ title was invisible while *Hide 18+ titles* was on, even when you typed its exact name (*Bad Thinking Diary* is flagged 18+); v1.6.23 retries a search that found nothing with 18+ titles included. Also make sure the search actually ran — see §3, the box only searches when you press the keyboard's search key. |
+| Search shows unrelated titles, or the title I typed is missing | Update to **v1.6.24 or newer**, which matches and ranks results locally *and* lets the site rank a text search by relevance. Before v1.6.24 the source's *Sort by* filter defaulted to *Latest updated*, and that default was sent on every search, so results were ordered like a date feed. Also make sure **Smart search (typo tolerant)** is on in the source settings (it is by default). If one spelling still fails, try fewer words: `mieruko` instead of `mieruko-ct`. |
 | The extension vanishes right after you trust it, or is not listed at all | Follow **section 10** — it is written as a checklist, in order. Short version: uninstall the old extension first (older builds used a different signing key), install the newest APK, check Android *Settings → Apps* for the version, and enable *Show NSFW sources* for builds older than v1.6.9. |
 | (old note) Fixed since v1.6.9. Earlier builds were flagged as NSFW, and both Komikku and Mihon silently drop NSFW-flagged extensions while *Settings → Browse → Show NSFW sources* is off. Either update to v1.6.9+, or enable that toggle (Komikku: Settings → Browse → **NSFW content → Show NSFW sources**, then restart the app) and trust the extension again. |
 | Extension loaded, but no source in Browse | The app hides sources whose language is not enabled. Komikku: Settings → Browse → **Languages** → enable the languages you want; then restart. |
