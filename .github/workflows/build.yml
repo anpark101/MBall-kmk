@@ -11,7 +11,6 @@ on:
       - '**.md'
       - 'build-info/**'
       - 'build-logs/**'
-      - 'tools/**'
   workflow_dispatch:
 
 permissions:
@@ -140,12 +139,29 @@ jobs:
             "$TOOLS/aapt2" dump xmltree --file AndroidManifest.xml "$apk" \
               | grep -A 2 "E: meta-data" | head -n 60
             echo
-            echo "## Extension classes present in classes.dex"
-            unzip -p "$apk" classes.dex > /tmp/classes.dex
-            strings /tmp/classes.dex | grep -E "MangaBall(Factory|Source|Languages|Catalog|Filters|Query)$" | sort -u
-            echo
-            echo "## Source factory entry point"
-            strings /tmp/classes.dex | grep -c "eu/kanade/tachiyomi/extension/all/mangaball" || true
+            echo "## Classes DEFINED in the APK (dex class_defs - the classes actually shipped)"
+            rm -rf /tmp/dexdir && mkdir -p /tmp/dexdir
+            unzip -o -q "$apk" 'classes*.dex' -d /tmp/dexdir
+            set +e
+            python3 tools/dex_classes.py /tmp/dexdir/classes*.dex \
+              --list-prefix eu/kanade/tachiyomi/extension/all/mangaball \
+              --forbid kotlin/ --forbid kotlinx/ --forbid okhttp3/ --forbid okio/ \
+              --forbid uy/ --forbid org/jsoup/ --forbid rx/ --forbid androidx/ \
+              --forbid org/jetbrains/ \
+              --require eu/kanade/tachiyomi/extension/all/mangaball/MangaBallFactory
+            dex_rc=$?
+            set -e
+            if [ "$dex_rc" = "1" ]; then
+              {
+                echo "!! FATAL: this APK bundles runtime classes that the reader app already provides."
+                echo "!! The extension class loader is parent-LAST, so the bundled copies shadow the"
+                echo "!! app's own and every suspend call fails with IncompatibleClassChangeError."
+                echo "!! Keep every library dependency compileOnly in extension/build.gradle.kts."
+              } | tee /dev/stderr
+              exit 1
+            elif [ "$dex_rc" != "0" ]; then
+              echo "!! WARNING: the dex contents could not be fully verified (exit $dex_rc) - check by hand." | tee /dev/stderr
+            fi
             echo
             echo "## Archive contents"
             unzip -l "$apk" | head -n 30
@@ -182,8 +198,18 @@ jobs:
             **Install (phone)**
             1. Download the APK below.
             2. Open it, and allow installs from this source if Android asks.
-            3. Open Komikku → **More → Extensions → Untrusted** → tap the shield next to *MangaBall Enhanced*.
+            3. Open Komikku → **More → Extensions**. *MangaBall Enhanced* is listed under **Installed**
+               with the word *Untrusted* — tap the **shield ✓** button on its right, then **Trust**.
+               (Needed once per update: trust is remembered per versionCode.)
             4. Komikku → **Browse** → pick a **MangaBall (…)** source → **Filter** to use the enhanced search.
+            5. Only see *MangaBall (Diagnostics)*? Open it — it says exactly what is wrong.
+
+            **Fixed in this build:** opening a source no longer crashes the app with
+            `java.lang.IncompatibleClassChangeError: ... does not implement interface
+            'kotlin.coroutines.Continuation'`. The APK no longer bundles the Kotlin standard
+            library, which was shadowing the app's own copy through the app's parent-last
+            extension class loader. CI now proves on every build that the APK ships no library
+            classes at all.
 
             **What it does**
 

@@ -98,8 +98,15 @@ kotlin {
 }
 
 dependencies {
-    // Everything below is provided by the reader app at runtime. Nothing is bundled
-    // into the APK, which keeps it small and avoids class-loader conflicts.
+    // Everything below is provided by the reader app at runtime. Nothing at all may be bundled
+    // into the APK: the app's extension class loader is parent-LAST, so any class shipped here
+    // shadows the app's own copy of it. That is fatal for the Kotlin standard library, whose
+    // kotlin.coroutines.Continuation the app passes into our suspend functions - a bundled copy
+    // makes every request throw java.lang.IncompatibleClassChangeError.
+    // `kotlin.stdlib.default.dependency=false` in gradle.properties stops the Kotlin plugin from
+    // adding stdlib as an implementation dependency; we add it back as compile-only so the code
+    // still compiles against it.
+    compileOnly(kotlin("stdlib"))
     compileOnly("com.github.mihonapp:tachiyomix:1.6.0") // extension API stubs
     compileOnly("com.squareup.okhttp3:okhttp:5.4.0")
     compileOnly("com.github.mihonapp:injekt:91edab2317")
@@ -108,7 +115,9 @@ dependencies {
     compileOnly("io.reactivex:rxjava:1.3.8")
     compileOnly("org.jsoup:jsoup:1.22.2")
 
-    // Unit tests: JUnit plus the same API stubs so filter classes can be constructed.
+    // Unit tests: JUnit plus the same API stubs so filter classes can be constructed. These are
+    // test-only and are never packaged into the APK.
     testImplementation("junit:junit:4.13.2")
+    testImplementation(kotlin("stdlib"))
     testImplementation("com.github.mihonapp:tachiyomix:1.6.0")
 }
