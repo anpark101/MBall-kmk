@@ -65,6 +65,14 @@ page reading, 40 language variants, and a few quality-of-life switches.
 > **Every update needs that tap again.** Trust is remembered as
 > `packageName:versionCode:fingerprint`, so a new versionCode (a new APK) is untrusted again
 > until you tap the shield once more.
+>
+> ### ⚠️ Second trap: a source that opens with an error / kills the app
+>
+> Builds up to **v1.6.16** crashed the app the moment a MangaBall source was opened, with
+> `java.lang.IncompatibleClassChangeError: ... does not implement interface
+> 'kotlin.coroutines.Continuation'`. **Install v1.6.17 or newer** — see §8 for the explanation.
+> The crash was never about your phone or your settings: the APK shipped its own copy of the
+> Kotlin standard library, which shadowed the reader app's copy.
 
 ### Updating later
 
@@ -233,6 +241,51 @@ whose `lang` is in *Settings → Browse → Languages*. English is enabled by de
 (`getDefaultEnabledLanguages() = {"all", "en", Locale.getDefault().language}`), so a normal
 install needs no change there.
 
+### Why opening a source killed the app (fixed in v1.6.17)
+
+With trust solved, a new failure appeared the moment a source was opened:
+
+```
+java.lang.IncompatibleClassChangeError: Class 'eu.kanade.tachiyomi.ui.browse.source.feed
+.SourceFeedScreenModel$getFeed$1$1$1$page$1' does not implement interface
+'kotlin.coroutines.Continuation' in call to 'kotlin.coroutines.CoroutineContext
+kotlin.coroutines.Continuation.getContext()'
+(declaration of 'kotlin.coroutines.jvm.internal.ContinuationImpl' appears in
+ /data/app/.../eu.kanade.tachiyomi.extension.all.mangaball-.../base.apk)
+```
+
+Read that last line carefully: the app resolved Kotlin's coroutine runtime **out of the extension
+APK**. The reader app loads extensions with `ChildFirstPathClassLoader`, which is parent-**last** —
+it tries the system loader first, then **the classes inside the extension APK**, and only then the
+app itself. So anything the extension packages shadows the app's own copy of the same class.
+
+The Kotlin Gradle plugin adds `kotlin-stdlib` as an *implementation* dependency by default, so the
+APK contained `kotlin.coroutines.Continuation` and `kotlin.coroutines.jvm.internal.ContinuationImpl`.
+The app then handed its coroutine (implementing **its** `Continuation`) to our `suspend fun search`,
+which expected the **APK's** `Continuation` interface → the cast failed and the app died. Every
+request did this, so every source was unusable.
+
+The fix (v1.6.17):
+
+```properties
+# gradle.properties
+kotlin.stdlib.default.dependency=false
+```
+```kotlin
+// extension/build.gradle.kts
+compileOnly(kotlin("stdlib"))   // provided by the app, must never be packaged
+```
+
+`tools/dex_classes.py` and a CI step now guarantee it: the build reads the dex `class_defs` table
+(the classes actually shipped) and **fails** if any class under `kotlin/`, `kotlinx/`, `okhttp3/`,
+`okio/`, `uy/`, `rx/`, `org/jsoup/`, `androidx/` or `org/jetbrains/` is defined in the APK. The
+full class list lands in `build-info/apk-verification.txt` on every build. Grepping the dex string
+pool would not have caught this, because referenced types such as `Lkotlin/coroutines/Continuation;`
+appear there even when the class is not shipped.
+
+> This is why an extension APK should be tiny. When this bug was fixed the APK went from
+> **745,236 bytes to 72,966 bytes** — that 670 KB difference was the bundled standard library.
+
 ---
 
 ## 9. Notes
@@ -291,6 +344,14 @@ that is the entire problem, and no reader-app setting will help.
 | App too old for extension lib 1.6 | Komikku and Mihon must support extension **lib 1.6** (Komikku ≥ 1.13.x, Mihon ≥ 0.19). Update the reader app. |
 | Another extension uses the same package name | Both *MangaBall Enhanced* and the official *Manga Ball* are `eu.kanade.tachiyomi.extension.all.mangaball` - only one can be installed. Uninstall the other. |
 | Package visibility | Not an issue: Komikku/Mihon request `QUERY_ALL_PACKAGES`, and the APK declares `<uses-feature android:name="tachiyomi.extension" />`. Both are verified on every build in `build-info/apk-verification.txt`. |
+
+### Step 3a - The source is in Browse but opening it crashes the app
+
+`java.lang.IncompatibleClassChangeError ... does not implement interface
+'kotlin.coroutines.Continuation'` means the APK bundles the Kotlin standard library, which
+shadows the app's own copy (the extension class loader is parent-last). Fixed in **v1.6.17**:
+install that build or newer. `build-info/apk-verification.txt` proves on every release that no
+library classes are shipped.
 
 ### Step 3b - The two app-side filters that hide *sources* (not the extension)
 
