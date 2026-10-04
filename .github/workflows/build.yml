@@ -76,6 +76,9 @@ jobs:
 
       - name: Run tests
         run: |
+          # pipefail: without it, `gradle | tee` hides a failure behind tee's exit status. A test
+          # source that does not even compile was published as a release that way once.
+          set -o pipefail
           # --rerun-tasks: never take a cached/up-to-date test task, so a JUnit report always
           # exists for the verification step below.
           gradle :extension:testReleaseUnitTest --rerun-tasks --no-daemon --console=plain --info 2>&1 | tee test-output.log
@@ -126,7 +129,12 @@ jobs:
               # The test step's output was cleaned up somehow - redo it here so the release is
               # never published without evidence that the tests passed.
               echo "!! no test results directory - running the unit tests again"
-              gradle :extension:testReleaseUnitTest --rerun-tasks --no-daemon --console=plain >/dev/null 2>&1 || true
+              if ! gradle :extension:testReleaseUnitTest --rerun-tasks --no-daemon --console=plain \
+                > /tmp/test-retry.log 2>&1; then
+                echo "!! the unit tests failed on the retry - refusing to publish" | tee /dev/stderr
+                grep -n -E "^(e|w): |FAILED|tests completed" /tmp/test-retry.log | head -n 30 | tee /dev/stderr
+                exit 1
+              fi
               xmls=$(ls extension/build/test-results/testReleaseUnitTest/*.xml 2>/dev/null || true)
             fi
             if [ -n "$xmls" ]; then
@@ -146,7 +154,8 @@ jobs:
               ls -R extension/build/test-results 2>/dev/null | head -n 20 || true
               echo "gradle test summary from the log:"
               grep -E "MangaBall(Logic|Search)Test|tests completed|FAILED|FROM-CACHE" test-output.log 2>/dev/null | tail -n 20 || true
-              echo "!! WARNING: continuing without a verified test count" | tee /dev/stderr
+              echo "!! FATAL: could not verify that the unit tests pass" | tee /dev/stderr
+              exit 1
             fi
             echo "File: $(basename "$apk")  ($(stat -c %s "$apk") bytes)"
             echo

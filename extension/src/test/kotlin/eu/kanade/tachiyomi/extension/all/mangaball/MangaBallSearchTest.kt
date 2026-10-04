@@ -21,12 +21,13 @@ class MangaBallSearchTest {
         SManga.create().apply {
             url = title.lowercase().replace(Regex("[^a-z0-9]+"), "-").trim('-')
             this.title = title
+            // SManga.memo is a JsonObject in the extension API - build it directly.
             memo = buildJsonObject {
                 put(
                     "altTitles",
                     buildJsonArray { alternativeTitles.forEach { add(JsonPrimitive(it)) } },
                 )
-            }.toString()
+            }
         }
 
     private fun score(query: String, title: String): Double = SmartSearch.similarity(query, title)
