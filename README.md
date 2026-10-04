@@ -122,6 +122,22 @@ checked against what you typed, and only the ones that really match stay:
 This is the **Smart search (typo tolerant)** switch in the source settings (§4), on by default.
 Turn it off to see exactly what the site returns, untouched.
 
+### The search box only searches when you submit it
+
+Typing text into the box does **not** start a search. Press the **magnifier / enter key** on your
+keyboard (the key labelled *Search* or *Go*). While the list under the box is the **Popular** or
+**Latest** feed — the chips at the top of the screen — you are browsing, not searching, whatever
+the box says.
+
+### Titles that the site marks as 18+
+
+**Hide 18+ titles** is honoured, with one exception: when a search comes back with nothing that
+looks like what you typed, it is sent once more with 18+ titles allowed. That matters because a
+title can be **removed by the server itself** while the filter is on — *Bad Thinking Diary* is
+flagged 18+, so searching for it by name returns no sign of it at all and the list fills up with
+unrelated titles instead. If you would rather never see an 18+ result, turn off **Find 18+ titles
+when nothing else matches** in the source settings (§4).
+
 ### Extra query tokens
 
 Type these directly into the search box (they can be mixed with normal words):
@@ -156,6 +172,9 @@ Komikku → *MangaBall source* → ⚙️ (per-extension settings):
 - **Smart search (typo tolerant)** — on by default. Relevance-first title matching that ignores
   accents, hyphens and missing spaces, retries close spellings, and drops results that do not
   match (see §3). Turn it off to see the site's raw, unfiltered answer.
+- **Find 18+ titles when nothing else matches** — on by default. *Hide 18+ titles* stays in
+  charge, except when a search finds nothing that looks like what you typed — then 18+ titles are
+  searched too, so a title you know by name is never missing. Turn off for a strict 18+ filter.
 - **Only titles available in this source's language** — local filter on top of the results.
 - **Show chapters in every language** — off by default: an English source lists English chapters only.
 - **Use Cloudflare bypass client** — turn this on if searches fail with HTTP 403 or "Just a moment".
@@ -209,6 +228,7 @@ in about three minutes.
 | Symptom | Fix |
 | --- | --- |
 | Source shows a red *untrusted* marker | Extensions → Untrusted → tap the shield next to *MangaBall Enhanced*. |
+| The title I typed is not in the list, but it exists on the site | Update to **v1.6.23 or newer**. Before v1.6.23 an 18+ title was invisible while *Hide 18+ titles* was on, even when you typed its exact name (*Bad Thinking Diary* is flagged 18+). v1.6.23 retries a search that found nothing with 18+ titles included. Also make sure the search actually ran — see §3, the box only searches when you press the keyboard's search key. |
 | Search shows unrelated titles, or the title I typed is missing | Update to **v1.6.22 or newer**, which matches and ranks results locally, and make sure **Smart search (typo tolerant)** is on in the source settings (it is by default). If one spelling still fails, try fewer words: `mieruko` instead of `mieruko-ct`. |
 | The extension vanishes right after you trust it, or is not listed at all | Follow **section 10** — it is written as a checklist, in order. Short version: uninstall the old extension first (older builds used a different signing key), install the newest APK, check Android *Settings → Apps* for the version, and enable *Show NSFW sources* for builds older than v1.6.9. |
 | (old note) Fixed since v1.6.9. Earlier builds were flagged as NSFW, and both Komikku and Mihon silently drop NSFW-flagged extensions while *Settings → Browse → Show NSFW sources* is off. Either update to v1.6.9+, or enable that toggle (Komikku: Settings → Browse → **NSFW content → Show NSFW sources**, then restart the app) and trust the extension again. |
