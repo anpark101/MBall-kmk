@@ -106,6 +106,13 @@ internal fun JsonObject.toSManga(): SManga {
     val slug = string("slug").orEmpty()
     val titleTags = tags()
     MangaBallCatalog.learn(titleTags)
+    // Alternative titles are kept (shortened and capped) because searching for "mieruko",
+    // "The Girl Who Can See Them" or "見える子ちゃん" must all find the same entry.
+    val altTitles = strings("alternateName")
+        .map { it.trim().take(90) }
+        .filter { it.isNotEmpty() }
+        .distinct()
+        .take(12)
 
     return SManga.create().apply {
         url = slug.ifBlank { titleId }
@@ -118,6 +125,7 @@ internal fun JsonObject.toSManga(): SManga {
             put("langs", buildJsonArray { availableLanguages().forEach { add(JsonPrimitive(it)) } })
             put("tags", buildJsonArray { titleTags.forEach { add(JsonPrimitive(it.id)) } })
             put("tagNames", buildJsonArray { titleTags.forEach { add(JsonPrimitive(it.name)) } })
+            put("altTitles", buildJsonArray { altTitles.forEach { add(JsonPrimitive(it)) } })
             put("adult", bool("is18plus") ?: false)
         }
     }
@@ -227,6 +235,8 @@ internal fun SManga.titleId(): String? = memo.string("id")?.takeIf { it.isNotBla
 internal fun SManga.memoTagIds(): List<String> = memo.strings("tags")
 
 internal fun SManga.memoTagNames(): List<String> = memo.strings("tagNames")
+
+internal fun SManga.memoAltTitles(): List<String> = memo.strings("altTitles")
 
 internal fun SManga.memoLanguages(): List<String> = memo.strings("langs")
 

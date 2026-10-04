@@ -19,6 +19,7 @@ import eu.kanade.tachiyomi.source.model.SMangaUpdate
 import eu.kanade.tachiyomi.source.online.HttpSource
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import okhttp3.HttpUrl
@@ -51,6 +52,7 @@ private const val PREF_ONLY_SOURCE_LANGUAGE = "pref_only_source_language"
 private const val PREF_ALL_CHAPTER_LANGUAGES = "pref_all_chapter_languages"
 private const val PREF_DEPTH = "pref_search_depth"
 private const val PREF_SCANLATOR_BLACKLIST = "pref_scanlator_blacklist"
+private const val PREF_SMART_SEARCH = "pref_smart_search"
 
 internal class MangaBallSource(
     override val lang: String,
@@ -102,8 +104,19 @@ internal class MangaBallSource(
             .joinToString(" ")
 
         val sortFilter = filters.ofType<SortFilter>()
-        val sortBy = syntax.sortBy ?: sortFilter?.sortBy ?: forcedSort ?: SearchSyntax.DEFAULT_SORT
-        val sortOrder = syntax.sortOrder ?: sortFilter?.sortOrder ?: "desc"
+        val explicitSortBy = syntax.sortBy ?: sortFilter?.sortBy
+
+        // A keyword search must never be forced into "recently updated" order. The site's fuzzy
+        // search can return a hundred loosely related titles, and sorting those by date is what
+        // buries the title the user actually asked for (that is how a search for "mieruko-ct"
+        // ended up showing "Super! Makoto-Chan" and friends). With no sort_by the API ranks by
+        // its own relevance score, which puts the real match first. An explicit user sort - the
+        // Sort by filter or a `sort:` token - is still honoured.
+        val keywordSearch = keyword.isNotBlank()
+        val sortBy: String? = explicitSortBy
+            ?: if (keywordSearch) null else (forcedSort ?: SearchSyntax.DEFAULT_SORT)
+        val sortOrder: String? =
+            if (sortBy == null) null else (syntax.sortOrder ?: sortFilter?.sortOrder ?: "desc")
 
         val tagGroups = filters.filterIsInstance<TagStateGroup>()
         val includedTags = (tagGroups.flatMap { it.included } + syntax.includedTags).distinct()
@@ -160,6 +173,29 @@ internal class MangaBallSource(
         }
 
         var results: List<SManga> = collected.values.toList()
+
+        if (keywordSearch && preferences.getBoolean(PREF_SMART_SEARCH, true)) {
+            results = refineForQuery(
+                query = keyword,
+                items = results,
+                urlForVariant = { variant ->
+                    buildSearchUrl(
+                        page = 1,
+                        keyword = variant,
+                        sortBy = sortBy,
+                        sortOrder = sortOrder,
+                        tagMode = tagMode,
+                        includedTags = includedTags,
+                        excludedTags = excludedTags,
+                        type = type,
+                        status = status,
+                        demographic = demographic,
+                        adultMode = adultMode,
+                    )
+                },
+            )
+        }
+
         val onlySourceLanguage = preferences.getBoolean(PREF_ONLY_SOURCE_LANGUAGE, false)
         if (includeLanguages.isNotEmpty() || excludeLanguages.isNotEmpty() || onlySourceLanguage) {
             results = results.filter { manga ->
@@ -178,8 +214,8 @@ internal class MangaBallSource(
     private fun buildSearchUrl(
         page: Int,
         keyword: String,
-        sortBy: String,
-        sortOrder: String,
+        sortBy: String?,
+        sortOrder: String?,
         tagMode: String,
         includedTags: List<String>,
         excludedTags: List<String>,
@@ -190,11 +226,12 @@ internal class MangaBallSource(
     ): HttpUrl = "$API_URL/title/search-advanced".toHttpUrl().newBuilder()
         .addQueryParameter("page", page.toString())
         .addQueryParameter("limit", PAGE_SIZE.toString())
-        .addQueryParameter("sort_by", sortBy)
-        .addQueryParameter("sort_order", sortOrder)
         .addQueryParameter("tag_mode", tagMode)
         .addQueryParameter("adult_mode", adultMode)
         .apply {
+            // No sort_by at all means "rank by relevance", which is what a search wants.
+            if (sortBy != null) addQueryParameter("sort_by", sortBy)
+            if (sortOrder != null) addQueryParameter("sort_order", sortOrder)
             if (keyword.isNotBlank()) addQueryParameter("keyword", keyword)
             if (includedTags.isNotEmpty()) addQueryParameter("included_tags", includedTags.joinToString(","))
             if (excludedTags.isNotEmpty()) addQueryParameter("excluded_tags", excludedTags.joinToString(","))
@@ -203,6 +240,41 @@ internal class MangaBallSource(
             if (demographic.isNotBlank()) addQueryParameter("publicationDemographic", demographic)
         }
         .build()
+
+    /**
+     * Removes results that have nothing to do with the query and, when the server's first answer
+     * contained nothing close to it, retries with typo-tolerant variants ("mieruko", "mieruk",
+     * "nartuo" -> "naruto") - bounded to [SmartSearch.MAX_PROBES] extra requests so a search
+     * stays fast. The scoring and the variant list live in [SmartSearch].
+     */
+    private suspend fun refineForQuery(
+        query: String,
+        items: List<SManga>,
+        urlForVariant: (String) -> HttpUrl,
+    ): List<SManga> {
+        val pool = LinkedHashMap<String, SManga>()
+        items.forEach { pool[it.url] = it }
+
+        var best = pool.values.maxOfOrNull { scoreManga(query, it) } ?: 0.0
+        if (best >= SmartSearch.KEEP) return SmartSearch.rankForQuery(query, pool.values.toList())
+
+        val variants = SmartSearch.candidateQueries(query)
+        for (index in 0 until minOf(variants.size, SmartSearch.MAX_PROBES)) {
+            val variant = variants[index]
+            val extra = try {
+                fetchSearchPage(urlForVariant(variant)).first
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (_: Exception) {
+                continue // a variant that fails (Cloudflare, timeout) must not fail the search
+            }
+            extra.forEach { pool.putIfAbsent(it.url, it) }
+            best = pool.values.maxOfOrNull { scoreManga(query, it) } ?: 0.0
+            if (best >= SmartSearch.STRONG) break
+        }
+
+        return SmartSearch.rankForQuery(query, pool.values.toList())
+    }
 
     private suspend fun fetchSearchPage(url: HttpUrl): Pair<List<SManga>, Boolean> {
         val response = client.newCall(GET(url, headers)).await()
@@ -358,6 +430,15 @@ internal class MangaBallSource(
             key = PREF_HIDE_NSFW
             title = "Hide 18+ titles"
             summary = "Ask the server to leave out titles marked as 18+. Recommended."
+            setDefaultValue(true)
+        }.also(screen::addPreference)
+
+        SwitchPreferenceCompat(screen.context).apply {
+            key = PREF_SMART_SEARCH
+            title = "Smart search (typo tolerant)"
+            summary = "Drops results that do not match what you typed, ignores accents, hyphens " +
+                "and missing spaces, and retries close spellings when nothing matches " +
+                "(\"mieruko-ct\" still finds Mieruko-chan). Turn off to see the site's raw answer."
             setDefaultValue(true)
         }.also(screen::addPreference)
 
