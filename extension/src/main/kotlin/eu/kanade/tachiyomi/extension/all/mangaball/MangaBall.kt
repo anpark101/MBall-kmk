@@ -19,7 +19,9 @@ import eu.kanade.tachiyomi.source.model.SMangaUpdate
 import eu.kanade.tachiyomi.source.online.HttpSource
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlin.coroutines.cancellation.CancellationException
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import okhttp3.HttpUrl
@@ -27,6 +29,7 @@ import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.MediaType
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
+import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.IOException
 import uy.kohesive.injekt.Injekt
@@ -204,7 +207,14 @@ internal class MangaBallSource(
                     demographic = demographic,
                     adultMode = adultMode,
                 )
-                val (items, more) = fetchSearchPage(url)
+                val (items, more) = try {
+                    fetchSearchPage(url)
+                } catch (cancellation: CancellationException) {
+                    throw cancellation
+                } catch (_: IOException) {
+                    // The extra pages exist to find more, never to fail the page already found.
+                    break
+                }
                 items.forEach { collected.putIfAbsent(it.url, it) }
                 hasNextPage = more
                 fetched++
@@ -351,20 +361,40 @@ internal class MangaBallSource(
         emptyList()
     }
 
-    private suspend fun fetchSearchPage(url: HttpUrl): Pair<List<SManga>, Boolean> {
-        val response = client.newCall(GET(url, headers)).await()
-        response.use {
-            if (!it.isSuccessful) throw IOException("HTTP ${it.code}")
-            val body = it.body?.string().orEmpty()
-            val root = body.parseJsonObject()
-                ?: throw IOException(NOT_JSON_HELP)
-            val data = root.arr("data")
-                ?: throw IOException(root.string("message") ?: "Malformed API response")
-            val items = data.mapNotNull { element -> element.asObject()?.toSManga() }
-            val currentPage = root.obj("pagination")?.int("page")?.toInt() ?: 1
-            val totalPages = root.obj("pagination")?.int("total_pages")?.toInt() ?: currentPage
-            return items to (currentPage < totalPages)
+    /**
+     * Performs one request and parses the JSON answer, retrying a transient failure (a Cloudflare
+     * 52x, a timeout, a challenge page that is HTML instead of JSON) a couple of times before the
+     * error reaches the reader. A 522 means the site's origin did not answer - waiting a second
+     * and asking again is exactly the right reaction.
+     */
+    private suspend fun jsonOf(request: Request): JsonObject {
+        var last: IOException? = null
+        for (attempt in 1..RETRY_ATTEMPTS) {
+            try {
+                client.newCall(request).await().use { response ->
+                    if (!response.isSuccessful) throw HttpStatusException(response.code)
+                    val body = response.body?.string().orEmpty()
+                    return body.parseJsonObject() ?: throw IOException(NOT_JSON_HELP)
+                }
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (error: IOException) {
+                if (!error.isWorthRetrying()) throw error
+                last = error
+                if (attempt < RETRY_ATTEMPTS) delay(retryDelayMillis(attempt))
+            }
         }
+        throw last ?: IOException("Request failed")
+    }
+
+    private suspend fun fetchSearchPage(url: HttpUrl): Pair<List<SManga>, Boolean> {
+        val root = jsonOf(GET(url, headers))
+        val data = root.arr("data")
+            ?: throw IOException(root.string("message") ?: "Malformed API response")
+        val items = data.mapNotNull { element -> element.asObject()?.toSManga() }
+        val currentPage = root.obj("pagination")?.int("page")?.toInt() ?: 1
+        val totalPages = root.obj("pagination")?.int("total_pages")?.toInt() ?: currentPage
+        return items to (currentPage < totalPages)
     }
 
     // ------------------------------------------------------------- local logic
@@ -403,16 +433,11 @@ internal class MangaBallSource(
 
     private suspend fun loadDetails(manga: SManga): SManga {
         val identifier = manga.titleId() ?: manga.url
-        val response = client.newCall(GET("$API_URL/title/detail/$identifier", headers)).await()
-        response.use {
-            if (!it.isSuccessful) throw IOException("HTTP ${it.code}")
-            val body = it.body?.string().orEmpty()
-            val root = body.parseJsonObject() ?: throw IOException("Empty response")
-            val data = root.obj("data")
-                ?: root.arr("data")?.firstOrNull()?.asObject()
-                ?: throw IOException("Malformed response")
-            return data.toMangaDetails().apply { url = manga.url }
-        }
+        val root = jsonOf(GET("$API_URL/title/detail/$identifier", headers))
+        val data = root.obj("data")
+            ?: root.arr("data")?.firstOrNull()?.asObject()
+            ?: throw IOException("Malformed response")
+        return data.toMangaDetails().apply { url = manga.url }
     }
 
     private suspend fun loadChapters(manga: SManga): List<SChapter> {
@@ -424,42 +449,34 @@ internal class MangaBallSource(
             .toByteArray()
             .toRequestBody(JSON_MEDIA_TYPE)
 
-        val response = client.newCall(POST("$API_URL/chapter/chapter-listing-by-title-id", headers, payload)).await()
-        response.use {
-            if (!it.isSuccessful) throw IOException("HTTP ${it.code}")
-            val body = it.body?.string().orEmpty()
-            val root = body.parseJsonObject() ?: return emptyList()
-            val data = root.arr("data") ?: return emptyList()
-            val allowedLanguages =
-                if (preferences.getBoolean(PREF_ALL_CHAPTER_LANGUAGES, false)) emptySet() else siteLanguages(lang)
-            val blacklist = scanlatorBlacklist()
-            return data.mapNotNull { element -> element.asObject()?.toSChapter(allowedLanguages) }
-                .filterNot { chapter ->
-                    blacklist.any { blocked -> chapter.scanlator?.equals(blocked, true) == true }
-                }
-        }
+        val root = jsonOf(POST("$API_URL/chapter/chapter-listing-by-title-id", headers, payload))
+        val data = root.arr("data") ?: return emptyList()
+        val allowedLanguages =
+            if (preferences.getBoolean(PREF_ALL_CHAPTER_LANGUAGES, false)) emptySet() else siteLanguages(lang)
+        val blacklist = scanlatorBlacklist()
+        return data.mapNotNull { element -> element.asObject()?.toSChapter(allowedLanguages) }
+            .filterNot { chapter ->
+                blacklist.any { blocked -> chapter.scanlator?.equals(blocked, true) == true }
+            }
     }
 
     private suspend fun loadTitleId(manga: SManga): String? {
-        val response = client.newCall(GET("$API_URL/title/detail/${manga.url}", headers)).await()
-        response.use {
-            val body = it.body?.string().orEmpty()
-            val root = body.parseJsonObject() ?: return null
-            val data = root.obj("data") ?: root.arr("data")?.firstOrNull()?.asObject() ?: return null
-            return data.string("id")
+        val root = try {
+            jsonOf(GET("$API_URL/title/detail/${manga.url}", headers))
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (_: IOException) {
+            return null
         }
+        val data = root.obj("data") ?: root.arr("data")?.firstOrNull()?.asObject() ?: return null
+        return data.string("id")
     }
 
     override suspend fun getPageList(chapter: SChapter): List<Page> {
-        val response = client.newCall(GET("$API_URL/chapter-detail?chapter_id=${chapter.url}", headers)).await()
-        response.use {
-            if (!it.isSuccessful) throw IOException("HTTP ${it.code}")
-            val body = it.body?.string().orEmpty()
-            val root = body.parseJsonObject() ?: throw IOException("Empty response")
-            val pages = root.obj("data")?.obj("chapter")?.strings("pages").orEmpty()
-            if (pages.isEmpty()) throw IOException("This chapter has no readable pages")
-            return pages.mapIndexed { index, url -> Page(index, url, url) }
-        }
+        val root = jsonOf(GET("$API_URL/chapter-detail?chapter_id=${chapter.url}", headers))
+        val pages = root.obj("data")?.obj("chapter")?.strings("pages").orEmpty()
+        if (pages.isEmpty()) throw IOException("This chapter has no readable pages")
+        return pages.mapIndexed { index, url -> Page(index, url, url) }
     }
 
     override fun getMangaUrl(manga: SManga): String =

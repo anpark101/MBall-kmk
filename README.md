@@ -244,6 +244,7 @@ in about three minutes.
 | Extension loaded, but no source in Browse | The app hides sources whose language is not enabled. Komikku: Settings → Browse → **Languages** → enable the languages you want; then restart. |
 | A work is not found by one of its alternative titles | Update to **v1.6.25 or newer**. Earlier builds remembered only the first 12 alternative titles of each work, so the name you typed (often a later one) was not recognised and the work was filtered off the page. |
 | Search returns nothing | Clear the included tags / switch Tag mode from AND to OR — very specific combinations genuinely have no results. |
+| "HTTP 522", 520, 523 or 524 | Those are Cloudflare saying **mangaball's own server** did not answer in time - nothing is wrong with your phone or the extension, and there is no setting to change. It usually clears up within minutes. Since **v1.6.26** the extension retries automatically and, if the extra search pages fail, keeps what it already found instead of showing an error. |
 | "HTTP 403" or a Cloudflare page | Enable **Use Cloudflare bypass client** in the source settings. |
 | "App not installed" when updating | You are installing an APK with a different signature — uninstall the old extension first (the library entries can be re-added afterwards). |
 | Chapters list is empty | The title may only have chapters in another language — enable **Show chapters in every language** or switch to that language's source. |
