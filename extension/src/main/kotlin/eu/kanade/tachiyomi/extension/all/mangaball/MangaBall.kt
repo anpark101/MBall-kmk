@@ -445,11 +445,12 @@ internal class MangaBallSource(
             triedHosts += host
             forgetBadHost(host)
         }
-        throw if (cloudflareInvolved) {
+        val error = if (cloudflareInvolved) {
             IOException(cloudflareBlockedMessage(triedHosts))
         } else {
             last ?: IOException("Request failed")
         }
+        throw error
     }
 
     /** The same request aimed at another API host, for the failover path. */

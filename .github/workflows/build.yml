@@ -99,7 +99,12 @@ jobs:
             grep -E "FAILED|MangaBall(Logic|Search)Test" test-output.log 2>/dev/null | head -n 40 || true
             echo
             echo "### compiler diagnostics"
-            grep -n -E "^(e|w): " build-output.log | head -n 120 || true
+            # Compilation usually fails inside the test step, whose output lives
+            # in test-output.log - the APK step's log must not be the only source.
+            grep -n -E "^(e|w): " test-output.log build-output.log 2>/dev/null | head -n 120 || true
+            echo
+            echo "### task failures"
+            grep -E "FAILED|error:" test-output.log 2>/dev/null | head -n 40 || true
             echo
             echo "### failure summary"
             sed -n '/What went wrong/,/^\\* Try:/p' build-output.log | head -n 80 || true
