@@ -1,7 +1,14 @@
 ### test failures
 > Task :extension:compileReleaseKotlin FAILED
-BUILD FAILED in 1m 18s
+BUILD FAILED in 1m 11s
 
 ### compiler diagnostics
+test-output.log:2852:w: ⚠️ Deprecated Gradle Version
+test-output.log:3355:e: file:///home/runner/work/MBall-kmk/MBall-kmk/extension/src/main/kotlin/eu/kanade/tachiyomi/extension/all/mangaball/MangaBall.kt:433:55 Unresolved reference 'isCloudflareBypassFailure'.
+test-output.log:3356:e: file:///home/runner/work/MBall-kmk/MBall-kmk/extension/src/main/kotlin/eu/kanade/tachiyomi/extension/all/mangaball/MangaBallFactory.kt:193:66 Suspension functions can only be called within coroutine body.
+
+### task failures
+> Task :extension:compileReleaseKotlin FAILED
+BUILD FAILED in 1m 11s
 
 ### failure summary
