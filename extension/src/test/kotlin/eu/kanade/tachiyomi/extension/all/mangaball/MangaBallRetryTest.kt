@@ -47,8 +47,10 @@ class MangaBallRetryTest {
     }
 
     @Test
-    fun `a challenge page points at the bypass client`() {
-        assertTrue(friendlyHttpError(403).contains("Cloudflare bypass client"))
+    fun `a challenge page explains the block and the way around it`() {
+        val message = friendlyHttpError(403)
+        assertTrue(message, message.contains("Cloudflare"))
+        assertTrue(message, message.contains("browser"))
     }
 
     @Test

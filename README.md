@@ -186,7 +186,7 @@ Komikku → *MangaBall source* → ⚙️ (per-extension settings):
   searched too, so a title you know by name is never missing. Turn off for a strict 18+ filter.
 - **Only titles available in this source's language** — local filter on top of the results.
 - **Show chapters in every language** — off by default: an English source lists English chapters only.
-- **Use Cloudflare bypass client** — turn this on if searches fail with HTTP 403 or "Just a moment".
+- **Use Cloudflare bypass client** — leave this off on Komikku (Komikku's normal client already solves Cloudflare checks, and this extension tries a backup address on its own). It only matters on readers that keep a separate Cloudflare-solving client.
 - **Search depth (1–5 pages)** — how many result pages one search merges (higher = slower, more results).
 - **Scanlator blacklist** — comma separated group names whose chapters are hidden.
 
@@ -245,7 +245,7 @@ in about three minutes.
 | A work is not found by one of its alternative titles | Update to **v1.6.25 or newer**. Earlier builds remembered only the first 12 alternative titles of each work, so the name you typed (often a later one) was not recognised and the work was filtered off the page. |
 | Search returns nothing | Clear the included tags / switch Tag mode from AND to OR — very specific combinations genuinely have no results. |
 | "HTTP 522", 520, 523 or 524 | Those are Cloudflare saying **mangaball's own server** did not answer in time - nothing is wrong with your phone or the extension, and there is no setting to change. It usually clears up within minutes. Since **v1.6.27** the extension retries automatically and, if the extra search pages fail, keeps what it already found instead of showing an error. |
-| "HTTP 403" or a Cloudflare page | Enable **Use Cloudflare bypass client** in the source settings. |
+| "HTTP 403", a Cloudflare page, or **"Failed to bypass Cloudflare"** | Cloudflare is challenging *your network's address*, not the extension. Since **v1.6.28** the extension automatically repeats every request on the site's backup address (`api.mangaball.com`) when the main one is challenged, remembers the address that worked, and no longer re-runs the in-app Cloudflare check three times in a row. If you still see the error, both addresses are blocked for your network: open <https://mangaball.com> in your phone's browser and pass any check shown there, switch between Wi-Fi and mobile data, or turn on **DNS over HTTPS** (Komikku: More → Settings → Advanced) and restart the app. A VPN clears it too. The **Use Cloudflare bypass client** switch is *not* needed for this on Komikku - Komikku's normal client already solves Cloudflare checks, so leave that switch off. |
 | "App not installed" when updating | You are installing an APK with a different signature — uninstall the old extension first (the library entries can be re-added afterwards). |
 | Chapters list is empty | The title may only have chapters in another language — enable **Show chapters in every language** or switch to that language's source. |
 | Tags I expect are missing from the filter list | Type `tag:the name` in the search box — the tag list also learns new tags automatically from results. |

@@ -21,6 +21,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlin.coroutines.cancellation.CancellationException
+import kotlin.jvm.Volatile
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -45,8 +46,9 @@ private const val USER_AGENT =
 private val JSON_MEDIA_TYPE: MediaType = "application/json".toMediaType()
 
 private const val NOT_JSON_HELP =
-    "The server did not answer with JSON. If this repeats, turn on \"Use Cloudflare bypass client\" " +
-        "in this source's settings."
+    "The server did not answer with JSON, which usually means a Cloudflare page was " +
+        "served instead of data. The backup address was tried as well. If this repeats, " +
+        "open https://mangaball.com in your phone's browser and pass any check shown there."
 
 // Preferences
 private const val PREF_BYPASS = "pref_cloudflare_client"
@@ -72,11 +74,32 @@ internal class MangaBallSource(
     }
 
     /**
-     * The site is behind Cloudflare. Normal requests usually go through, but a user can
-     * opt into the reader's challenge-solving client when they hit blocks.
+     * The site is behind Cloudflare. Komikku's regular client already attempts to
+     * solve a challenge in a hidden WebView (its "cloudflare client" is the same
+     * object), so the default is the right choice here; the switch below exists for
+     * readers that still keep a separate solving client.
      */
     override val client: OkHttpClient
         get() = if (preferences.getBoolean(PREF_BYPASS, false)) network.cloudflareClient else network.client
+
+    /**
+     * The API host that answered most recently. Cloudflare's rules are per host, so
+     * when only the main address is blocked, remembering the working one spares every
+     * later request a trip through the in-app WebView solver (up to half a minute
+     * each). In-memory only: a block can lift, so this never outlives the process.
+     */
+    @Volatile
+    private var goodHost: String? = null
+
+    private fun hostOrder(): List<String> = orderHosts(goodHost)
+
+    private fun rememberGoodHost(host: String) {
+        goodHost = host
+    }
+
+    private fun forgetBadHost(host: String) {
+        if (goodHost == host) goodHost = null
+    }
 
     override fun headersBuilder() = super.headersBuilder()
         .add("User-Agent", USER_AGENT)
@@ -362,29 +385,77 @@ internal class MangaBallSource(
     }
 
     /**
-     * Performs one request and parses the JSON answer, retrying a transient failure (a Cloudflare
-     * 52x, a timeout, a challenge page that is HTML instead of JSON) a couple of times before the
-     * error reaches the reader. A 522 means the site's origin did not answer - waiting a second
-     * and asking again is exactly the right reaction.
+     * Performs one request and parses the JSON answer.
+     *
+     * Two kinds of trouble are told apart:
+     *
+     *  * **A transient failure** (a Cloudflare 52x, a timeout) means the request
+     *    was fine and the site hiccuped - the same host is asked again, with a
+     *    growing pause between attempts.
+     *  * **A Cloudflare block or challenge** (the reader app's solver gave up,
+     *    or a 403/503/HTML answer came back) will not clear by asking again a
+     *    second later. Instead of burning three WebView attempts on the blocked
+     *    host, the request moves to the next address in [API_HOSTS] at once.
+     *    Cloudflare's rules are per host, so the backup address often answers
+     *    for a network the main address refuses.
      */
     private suspend fun jsonOf(request: Request): JsonObject {
         var last: IOException? = null
-        for (attempt in 1..RETRY_ATTEMPTS) {
-            try {
-                client.newCall(request).await().use { response ->
-                    if (!response.isSuccessful) throw HttpStatusException(response.code)
-                    val body = response.body?.string().orEmpty()
-                    return body.parseJsonObject() ?: throw IOException(NOT_JSON_HELP)
+        var cloudflareInvolved = false
+        val triedHosts = mutableListOf<String>()
+        for (host in hostOrder()) {
+            val hosted = request.onHost(host)
+            var challenged = false
+            for (attempt in 1..RETRY_ATTEMPTS) {
+                try {
+                    client.newCall(hosted).await().use { response ->
+                        val code = response.code
+                        if (!response.isSuccessful && isChallengeStatus(code)) {
+                            challenged = true
+                            throw CloudflareChallengeException(code)
+                        }
+                        if (!response.isSuccessful) throw HttpStatusException(code)
+                        val body = response.body?.string().orEmpty()
+                        val json = body.parseJsonObject()
+                        if (json != null) {
+                            rememberGoodHost(host)
+                            return json
+                        }
+                        if (looksLikeHtml(body)) {
+                            challenged = true
+                            throw CloudflareChallengeException(code)
+                        }
+                        throw IOException(NOT_JSON_HELP)
+                    }
+                } catch (cancellation: CancellationException) {
+                    throw cancellation
+                } catch (error: IOException) {
+                    val blocked = challenged || error.isCloudflareBypassFailure()
+                    last = error
+                    if (blocked) {
+                        cloudflareInvolved = true
+                        // Another identical attempt would only repeat the WebView
+                        // solve that just failed - try the next host instead.
+                        break
+                    }
+                    if (!error.isWorthRetrying()) throw error
+                    if (attempt < RETRY_ATTEMPTS) delay(retryDelayMillis(attempt))
                 }
-            } catch (cancellation: CancellationException) {
-                throw cancellation
-            } catch (error: IOException) {
-                if (!error.isWorthRetrying()) throw error
-                last = error
-                if (attempt < RETRY_ATTEMPTS) delay(retryDelayMillis(attempt))
             }
+            triedHosts += host
+            forgetBadHost(host)
         }
-        throw last ?: IOException("Request failed")
+        throw if (cloudflareInvolved) {
+            IOException(cloudflareBlockedMessage(triedHosts))
+        } else {
+            last ?: IOException("Request failed")
+        }
+    }
+
+    /** The same request aimed at another API host, for the failover path. */
+    private fun Request.onHost(host: String): Request {
+        if (url.host == host) return this
+        return newBuilder().url(url.newBuilder().host(host).build()).build()
     }
 
     private suspend fun fetchSearchPage(url: HttpUrl): Pair<List<SManga>, Boolean> {
@@ -566,7 +637,10 @@ internal class MangaBallSource(
         SwitchPreferenceCompat(screen.context).apply {
             key = PREF_BYPASS
             title = "Use Cloudflare bypass client"
-            summary = "Turn on when searches fail with HTTP 403 / a Cloudflare challenge."
+            summary = "Only useful on readers that keep a separate client for solving " +
+                "Cloudflare checks. Komikku's normal client already solves them (and " +
+                "this extension tries a backup address on its own), so on Komikku " +
+                "this switch changes nothing - leave it off."
             setDefaultValue(false)
         }.also(screen::addPreference)
 

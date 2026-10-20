@@ -11,6 +11,7 @@ import eu.kanade.tachiyomi.source.model.SChapter
 import eu.kanade.tachiyomi.source.model.SManga
 import eu.kanade.tachiyomi.source.model.SMangaUpdate
 import eu.kanade.tachiyomi.source.online.HttpSource
+import okhttp3.HttpUrl.Companion.toHttpUrl
 
 /**
  * Komikku / Mihon instantiate this class and call [createSources].
@@ -183,30 +184,40 @@ internal class MangaBallDiagnostics(
             },
         )
 
-        val reachability = try {
-            val response = client.newCall(GET("$baseUrl/api/v1/title/search-advanced?page=1&limit=1", headers)).await()
-            val code = response.code
-            val body = response.body?.string().orEmpty()
-            response.close()
-            when {
-                code == 200 && body.trimStart().startsWith("{") ->
-                    "OK - the site answered HTTP 200 with JSON (${body.length} characters). " +
-                        "Reading and searching work with this network."
-                code == 200 ->
-                    "HTTP 200 but the answer is not JSON, so a Cloudflare challenge or an " +
-                        "interstitial page is being served.\n\nTurn on \"Use Cloudflare bypass " +
-                        "client\" in the source's settings."
-                code == 403 ->
-                    "HTTP 403 - the site is blocking this connection (Cloudflare).\n\nTurn on " +
-                        "\"Use Cloudflare bypass client\" in the source's settings."
-                else -> "Unexpected HTTP $code.\n\n${body.take(300)}"
+        // One probe per API host: Cloudflare's rules are per host, so the main
+        // address can be blocked while the backup answers (and the extension
+        // fails over to it automatically).
+        val reachability = API_HOSTS.joinToString("\n\n") { host ->
+            val url = "https://$host/api/v1/title/search-advanced?page=1&limit=1".toHttpUrl()
+            val probe = try {
+                val response = client.newCall(GET(url, headers)).await()
+                val code = response.code
+                val body = response.body?.string().orEmpty()
+                response.close()
+                when {
+                    code == 200 && body.trimStart().startsWith("{") ->
+                        "OK - answered HTTP 200 with JSON (${body.length} characters)"
+                    code == 200 ->
+                        "HTTP 200 but the answer is not JSON, so a Cloudflare challenge " +
+                            "or an interstitial page is being served"
+                    else -> "HTTP $code - ${friendlyHttpError(code).take(160)}"
+                }
+            } catch (error: Throwable) {
+                "request failed: ${error.javaClass.simpleName} ${error.message.orEmpty().take(160)}"
             }
-        } catch (error: Throwable) {
-            "Request failed: ${error.javaClass.simpleName} ${error.message.orEmpty().take(200)}\n\n" +
-                "Check the phone's internet connection, then try again."
+            "• $host: $probe"
         }
 
-        entries += entry("3. Site reachability", reachability)
+        entries += entry(
+            "3. Site reachability (per address)",
+            "$reachability\n\n" +
+                "If one address is OK and the other is blocked, the extension already " +
+                "uses the working one automatically. If both are blocked, Cloudflare " +
+                "is challenging this network: open https://mangaball.com in the phone's " +
+                "browser and pass any check shown there, switch between Wi-Fi and " +
+                "mobile data, or turn on DNS over HTTPS in Komikku (More -> Settings " +
+                "-> Advanced) and restart the app.",
+        )
         entries += entry(
             "4. What to do with this information",
             "Send these three entries back to the developer:\n\n" +

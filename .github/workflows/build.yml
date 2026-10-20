@@ -244,12 +244,14 @@ jobs:
             4. Komikku → **Browse** → pick a **MangaBall (…)** source → **Filter** to use the enhanced search.
             5. Only see *MangaBall (Diagnostics)*? Open it — it says exactly what is wrong.
 
-            **Fixed in this build:** opening a source no longer crashes the app with
-            `java.lang.IncompatibleClassChangeError: ... does not implement interface
-            'kotlin.coroutines.Continuation'`. The APK no longer bundles the Kotlin standard
-            library, which was shadowing the app's own copy through the app's parent-last
-            extension class loader. CI now proves on every build that the APK ships no library
-            classes at all.
+            **Fixed in this build:** "Failed to bypass Cloudflare" no longer blocks
+            browsing and reading. Every request now automatically moves to the site's
+            backup address (api.mangaball.com) when Cloudflare challenges the main
+            one, the address that worked is remembered for the session, and a
+            blocked request is no longer re-sent three times through the in-app
+            Cloudflare solver. When both addresses are blocked, the error message
+            says exactly what to do (pass the check in a browser, switch networks,
+            or turn on DNS over HTTPS).
 
             **What it does**
 

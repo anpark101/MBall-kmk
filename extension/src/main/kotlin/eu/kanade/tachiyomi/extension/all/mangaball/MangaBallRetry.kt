@@ -26,7 +26,8 @@ internal fun retryDelayMillis(attempt: Int): Long = when {
 /**
  * Statuses worth retrying: the origin hiccuped, the request itself was fine. The 52x family is
  * Cloudflare's "origin unreachable" group; 403 is not here on purpose - it means a challenge
- * page, and the cure for that is the bypass client, not a second identical request.
+ * page, and the cure for that is the backup API host (see [API_HOSTS]), not a second
+ * identical request.
  */
 internal fun isTransientStatus(code: Int): Boolean = when (code) {
     408, 425, 429, 500, 502, 503, 504, 520, 521, 522, 523, 524 -> true
@@ -40,13 +41,16 @@ internal fun friendlyHttpError(code: Int): String = when (code) {
             "your phone or this extension - it usually clears up within minutes. Wait a moment " +
             "and search again."
     403 ->
-        "The site refused the request (HTTP 403), which usually means a Cloudflare challenge. " +
-            "Turn on \"Use Cloudflare bypass client\" in this source's settings."
+        "The site refused the request (HTTP 403), which is a Cloudflare challenge that " +
+            "even the backup address could not get around. Open mangaball.com in your " +
+            "phone's browser and pass the check shown there, switch between Wi-Fi and " +
+            "mobile data, or turn on DNS over HTTPS in Komikku's settings."
     429 ->
         "The site is asking for a slower pace (HTTP 429). Wait a minute, then search again."
     503 ->
-        "The site is briefly unavailable (HTTP 503). If it keeps happening with a Cloudflare " +
-            "page, turn on \"Use Cloudflare bypass client\"."
+        "The site is briefly unavailable (HTTP 503). If it keeps happening, Cloudflare is " +
+            "challenging this network - open mangaball.com in a browser and pass the " +
+            "check shown there."
     404 ->
         "The site reports that this title no longer exists (HTTP 404)."
     in 500..599 ->
@@ -57,6 +61,14 @@ internal fun friendlyHttpError(code: Int): String = when (code) {
 
 /** An HTTP status the site returned that is not a success. [message] is already readable. */
 internal class HttpStatusException(val code: Int) : IOException(friendlyHttpError(code))
+
+/**
+ * Cloudflare answered the request itself - a challenge or a block page, with or without
+ * the HTTP status that usually comes with it. Carries no remedy of its own: the caller
+ * moves on to the next API host (see [API_HOSTS]).
+ */
+internal class CloudflareChallengeException(code: Int) :
+    IOException("Cloudflare served a challenge page instead of the API answer (HTTP $code)")
 
 /** A failed request is retried, unless the site clearly rejected the request itself. */
 internal fun IOException.isWorthRetrying(): Boolean =
