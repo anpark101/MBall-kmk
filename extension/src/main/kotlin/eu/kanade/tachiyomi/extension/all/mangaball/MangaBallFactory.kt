@@ -186,8 +186,10 @@ internal class MangaBallDiagnostics(
 
         // One probe per API host: Cloudflare's rules are per host, so the main
         // address can be blocked while the backup answers (and the extension
-        // fails over to it automatically).
-        val reachability = API_HOSTS.joinToString("\n\n") { host ->
+        // fails over to it automatically). A plain loop because the probe is
+        // a suspension - joinToString's lambda may not suspend.
+        val probes = mutableListOf<String>()
+        for (host in API_HOSTS) {
             val url = "https://$host/api/v1/title/search-advanced?page=1&limit=1".toHttpUrl()
             val probe = try {
                 val response = client.newCall(GET(url, headers)).await()
@@ -205,8 +207,9 @@ internal class MangaBallDiagnostics(
             } catch (error: Throwable) {
                 "request failed: ${error.javaClass.simpleName} ${error.message.orEmpty().take(160)}"
             }
-            "• $host: $probe"
+            probes += "• $host: $probe"
         }
+        val reachability = probes.joinToString("\n\n")
 
         entries += entry(
             "3. Site reachability (per address)",

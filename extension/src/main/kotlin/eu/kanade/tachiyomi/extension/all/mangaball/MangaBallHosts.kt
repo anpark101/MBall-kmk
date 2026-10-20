@@ -37,12 +37,12 @@ internal fun orderHosts(lastKnownGood: String?): List<String> {
  * excluded on purpose: they mention Cloudflare too ("Cloudflare 522"), but a 522 is the
  * site's origin hiccuping and must be retried on the same host, not failed over.
  */
-internal fun isCloudflareBypassFailure(error: Throwable): Boolean {
-    if (error is HttpStatusException) return false
-    if (generateSequence(error) { it.cause }
+internal fun Throwable.isCloudflareBypassFailure(): Boolean {
+    if (this is HttpStatusException) return false
+    if (generateSequence(this) { it.cause }
         .any { it.javaClass.simpleName == "CloudflareBypassException" }
     ) return true
-    val message = error.message.orEmpty()
+    val message = this.message.orEmpty()
     return message.contains("bypass", ignoreCase = true) &&
         message.contains("cloudflare", ignoreCase = true)
 }

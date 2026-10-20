@@ -34,13 +34,12 @@ class MangaBallHostsTest {
 
     @Test
     fun `the reader app's bypass failure is recognized`() {
-        assertTrue(isCloudflareBypassFailure(IOException("Failed to bypass Cloudflare")))
+        assertTrue(IOException("Failed to bypass Cloudflare").isCloudflareBypassFailure())
         // The app's message is translated on the phone, so the class name of the
         // original exception is matched as well.
         assertTrue(
-            isCloudflareBypassFailure(
-                IOException("Gagal mengatasi Cloudflare", CloudflareBypassException()),
-            ),
+            IOException("Gagal mengatasi Cloudflare", CloudflareBypassException())
+                .isCloudflareBypassFailure(),
         )
     }
 
@@ -48,9 +47,9 @@ class MangaBallHostsTest {
     fun `our own cloudflare mentions are not bypass failures`() {
         // A 522 says "Cloudflare" in its message but is the site's origin
         // hiccuping - it must be retried on the same host, not failed over.
-        assertFalse(isCloudflareBypassFailure(HttpStatusException(522)))
-        assertFalse(isCloudflareBypassFailure(IOException("timeout")))
-        assertFalse(isCloudflareBypassFailure(IOException("Unexpected end of input")))
+        assertFalse(HttpStatusException(522).isCloudflareBypassFailure())
+        assertFalse(IOException("timeout").isCloudflareBypassFailure())
+        assertFalse(IOException("Unexpected end of input").isCloudflareBypassFailure())
     }
 
     @Test
